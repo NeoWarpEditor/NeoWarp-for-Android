@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head><script src="/bridge.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>协作</title>
+  <link rel="stylesheet" href="collaboration.css">
+</head>
+<body>
+  <!-- ========== 发起协作 ========== -->
+  <div id="view-host" class="view" role="region" aria-label="发起协作">
+    <div class="setup-body">
+      <div class="hero">
+        <div class="hero-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+        </div>
+        <div class="hero-text">
+          <h1>发起协作</h1>
+          <p>创建协作房间，邀请局域网内的伙伴一起编程</p>
+        </div>
+      </div>
+
+      <div class="address-card">
+        <div class="address-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <path d="M8 21h8M12 17v4"/>
+          </svg>
+        </div>
+        <div class="address-main">
+          <div class="address-label">协作者需要输入的地址</div>
+          <div class="address-value" id="host-address">获取中…</div>
+        </div>
+        <button type="button" class="icon-btn" id="btn-copy-address" title="复制地址" aria-label="复制地址">
+          <svg class="icon-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="9" y="9" width="13" height="13" rx="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          <svg class="icon-done" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="section-title">个人信息</div>
+      <div class="card">
+        <div class="row">
+          <span class="row-label">昵称</span>
+          <input type="text" id="host-nickname" placeholder="主机" maxlength="16" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="avatar-row">
+          <div class="avatar-current" id="host-avatar" aria-hidden="true">🏠</div>
+          <div class="avatar-grid" id="host-avatar-picker" role="group" aria-label="选择头像"></div>
+        </div>
+      </div>
+
+      <div class="section-title">连接设置</div>
+      <div class="card">
+        <div class="row" id="host-password-row">
+          <span class="row-label">房间密码</span>
+          <input type="password" id="host-password" placeholder="必填" autocomplete="new-password" maxlength="64">
+          <button type="button" class="reveal" data-target="host-password" aria-label="显示密码">
+            <svg class="icon-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="icon-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
+        <div class="row">
+          <span class="row-label grow">端口</span>
+          <input type="number" id="host-port" value="8080" min="1" max="65535">
+        </div>
+      </div>
+
+      <div class="section-title">协作者权限</div>
+      <div class="card">
+        <div class="row">
+          <span class="row-label grow">添加扩展<span class="row-sub">允许协作者为项目加载新扩展</span></span>
+          <label class="switch">
+            <input type="checkbox" id="perm-add-extension" checked aria-label="允许协作者添加扩展">
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <div class="row">
+          <span class="row-label grow">删除扩展<span class="row-sub">允许协作者移除已加载的扩展</span></span>
+          <label class="switch">
+            <input type="checkbox" id="perm-delete-extension" checked aria-label="允许协作者删除扩展">
+            <span class="switch-track"></span>
+          </label>
+        </div>
+        <div class="row">
+          <span class="row-label grow">删除角色<span class="row-sub">允许协作者删除舞台上的角色</span></span>
+          <label class="switch">
+            <input type="checkbox" id="perm-delete-sprite" checked aria-label="允许协作者删除角色">
+            <span class="switch-track"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-footer">
+      <div class="form-error" id="host-error" role="alert"></div>
+      <button type="button" class="btn-primary" id="btn-start-host">发起协作</button>
+    </div>
+  </div>
+  <!-- ========== 加入协作 ========== -->
+  <div id="view-join" class="view" role="region" aria-label="加入协作">
+    <div class="setup-body">
+      <div class="hero">
+        <div class="hero-icon join" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+        </div>
+        <div class="hero-text">
+          <h1>加入协作</h1>
+          <p>自动搜索局域网中的房间，点击即可选择</p>
+        </div>
+      </div>
+
+      <div class="section-title">个人信息</div>
+      <div class="card">
+        <div class="row">
+          <span class="row-label">昵称</span>
+          <input type="text" id="join-nickname" placeholder="随机生成" maxlength="16" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="avatar-row">
+          <div class="avatar-current" id="join-avatar" aria-hidden="true">👤</div>
+          <div class="avatar-grid" id="join-avatar-picker" role="group" aria-label="选择头像"></div>
+        </div>
+      </div>
+
+      <div class="section-title-row">
+        <div class="section-title">附近的协作房间</div>
+        <button type="button" class="chip-btn" id="btn-refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <polyline points="1 20 1 14 7 14"/>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          重新搜索
+        </button>
+      </div>
+      <div class="discovery" id="discovery-list"></div>
+
+      <div class="section-title">手动填写</div>
+      <div class="card">
+        <div class="row">
+          <span class="row-label">IP 地址</span>
+          <input type="text" id="join-ip" placeholder="192.168.1.100" autocomplete="off" spellcheck="false" inputmode="decimal">
+        </div>
+        <div class="row">
+          <span class="row-label grow">端口</span>
+          <input type="number" id="join-port" value="8080" min="1" max="65535">
+        </div>
+        <div class="row">
+          <span class="row-label">房间密码</span>
+          <input type="password" id="join-password" placeholder="必填" autocomplete="off" maxlength="64">
+          <button type="button" class="reveal" data-target="join-password" aria-label="显示密码">
+            <svg class="icon-show" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg class="icon-hide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-footer">
+      <div class="form-error" id="join-error" role="alert"></div>
+      <button type="button" class="btn-primary" id="btn-join">加入协作</button>
+    </div>
+  </div>
+  <!-- ========== 协作聊天 ========== -->
+  <div id="view-chat" class="view" role="region" aria-label="协作聊天">
+    <div class="chat-bar">
+      <div class="room-avatar" id="room-avatar" aria-hidden="true">🏠</div>
+      <div class="room-main">
+        <div class="room-title" id="room-title">协作房间</div>
+        <div class="room-status">
+          <span class="dot" id="room-dot"></span>
+          <span id="room-online">1 人在线</span>
+          <span class="role-tag" id="room-role">管理员</span>
+        </div>
+      </div>
+      <button type="button" class="bar-btn" id="btn-members" title="成员列表" aria-label="成员列表" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </button>
+      <button type="button" class="bar-btn leave" id="btn-leave" title="结束协作" aria-label="结束协作">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="chat-body">
+      <div class="messages" id="messages"></div>
+
+      <div class="members-catcher" id="members-catcher"></div>
+      <aside class="members" id="members-panel" aria-label="成员列表">
+        <div class="members-head">
+          <h2>成员 <span id="members-count">1</span></h2>
+          <button type="button" class="bar-btn small" id="btn-close-members" aria-label="收起成员列表">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+        <div class="members-list" id="members-list"></div>
+      </aside>
+    </div>
+
+    <div class="composer">
+      <div class="composer-field">
+        <input type="text" id="chat-input" placeholder="发送消息…" enterkeyhint="send" autocomplete="off" maxlength="500">
+        <span class="char-count" id="char-count"></span>
+      </div>
+      <button type="button" class="btn-send" id="btn-send" disabled aria-label="发送">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-body">
+        <h2 id="modal-title">结束协作</h2>
+        <p id="modal-text">结束后所有协作者都会断开连接。</p>
+      </div>
+      <div class="modal-actions">
+        <button type="button" id="modal-cancel">取消</button>
+        <button type="button" class="confirm" id="modal-confirm">结束</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="collaboration.js"></script>
+
+
+</body>
+</html>

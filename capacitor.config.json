@@ -1,0 +1,12 @@
+{
+  "appId": "org.neowarp.android",
+  "appName": "NeoWarp",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  }
+}

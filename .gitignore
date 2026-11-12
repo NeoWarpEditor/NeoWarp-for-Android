@@ -1,0 +1,23 @@
+# 本机/IDE
+android/local.properties
+.gradle/
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Node
+node_modules/
+
+# Gradle 构建产物
+android/build/
+android/app/build/
+android/app/src/main/assets/public/
+
+# assets/www 由 CI 从 www/ 复制生成（见 .github/workflows/android-build.yml）
+android/app/src/main/assets/www/
+
+# 本地打包输出
+*.apk
+*.log
+android/capacitor-cordova-android-plugins/build/
