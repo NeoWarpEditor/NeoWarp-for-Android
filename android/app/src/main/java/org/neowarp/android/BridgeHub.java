@@ -2003,7 +2003,7 @@ public class BridgeHub {
         try {
             return app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName;
         } catch (Exception e) {
-            return "2.3.0";
+            return "0.0.1";
         }
     }
 
@@ -2436,7 +2436,7 @@ public class BridgeHub {
             conn.setConnectTimeout(15000);
             conn.setReadTimeout(30000);
             conn.setInstanceFollowRedirects(true);
-            conn.setRequestProperty("User-Agent", "NeoWarp/2.3.0 (Android)");
+            conn.setRequestProperty("User-Agent", "NeoWarp/0.0.1 (Android)");
             int code = conn.getResponseCode();
             String mime = conn.getContentType();
             String charset = null;

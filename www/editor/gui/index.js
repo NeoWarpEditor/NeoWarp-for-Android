@@ -57496,7 +57496,7 @@ exports = module.exports = __webpack_require__(/*! ../../../../css-loader/lib/cs
 
 
 // module
-exports.push([module.i, "/* overridden by src/lib/themes/guiHelpers.js */\n\n/*\n    Contains constants for the z-index values of elements that are part of the global stack context.\n    In other words, z-index values that are \"inside\" a component are not added here.\n    This prevents conflicts between identical z-index values in different components.\n*/\n\n/* Toolbox z-index: 40; set in scratch-blocks */\n\n/* tooltips should go over add buttons if they overlap */\n\n/* monitors go over add buttons */\n\n/* \"ask\" block text input goes above monitors */\n\n/* menu-bar should go over monitors, alerts and tutorials */\n\n/* behind menu-bar */\n\n/* Block drag z-index: 1000; default 50 is overriden in blocks.css */\n\n/* so it is draggable into other panes */\n\n/* behind modals */\n\n/* behind modals */\n\n/* in most interfaces, the context menu is always on top */\n\n/* NeoWarp 自定义加载页样式：居中毛玻璃卡片 + 左右均分（粒子 Logo / 文案+进度条） */\n\n.loader_background_1rQeh {\n    position: absolute;\n    top: 0;\n    left: 0;\n    width: 100%;\n    height: 100%;\n    z-index: 490;\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    /* 半透明遮罩 + 毛玻璃，不填满纯色；文字颜色跟随主题（深下白/浅下黑） */\n    background-color: rgba(0, 0, 0, 0.28);\n    backdrop-filter: blur(14px);\n    -webkit-backdrop-filter: blur(14px);\n    font-family: \"HarmonyOS Sans SC\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    text-align: left;\n    color: var(--text-primary);\n}\n\n.loader_fullscreen_3zX_z {\n    /* Break out of the layout using position: fixed to cover the whole screen */\n    position: fixed;\n    /* Use the fullscreen stage z-index to allow covering full-screen mode */\n    z-index: 500;\n}\n\n/* 居中卡片：不填充整个屏幕；纵向布局（上：左右两栏，下：整宽进度条） */\n\n.loader_card_1rvHl {\n    display: flex;\n    flex-direction: column;\n    align-items: stretch;\n    gap: 1.5rem;\n    padding: 2.75rem 3.25rem;\n    border-radius: 24px;\n    /* 浅色主题：白色半透明卡片；深色主题（默认变量）：深色半透明卡片 */\n    background: color-mix(in srgb, var(--ui-modal-background) 78%, transparent);\n    border: 0.5px solid var(--ui-black-transparent);\n    color: var(--text-primary);\n    box-shadow:\n        0 24px 70px rgba(0, 0, 0, 0.25),\n        0 0 0 0.5px var(--ui-black-transparent);\n    backdrop-filter: blur(28px) saturate(160%);\n    -webkit-backdrop-filter: blur(28px) saturate(160%);\n    max-width: 640px;\n    animation: loader_cardIn_1Pi5V 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;\n}\n\n/* 上排：左右两栏（粒子 Logo / 文案） */\n\n.loader_mainRow_Dl3xt {\n    display: flex;\n    flex-direction: row;\n    align-items: center;\n    gap: 2.5rem;\n}\n\n@keyframes loader_cardIn_1Pi5V {\n    from {\n        opacity: 0;\n        transform: translateY(14px) scale(0.97);\n    }\n    to {\n        opacity: 1;\n        transform: translateY(0) scale(1);\n    }\n}\n\n.loader_left_3Hh4t {\n    flex: 0 0 auto;\n    display: flex;\n    align-items: flex-start;\n    justify-content: center;\n}\n\n.loader_particleCanvas_pnaYo {\n    display: block;\n    width: 260px;\n    height: 260px;\n}\n\n.loader_right_245wf {\n    flex: 1 1 auto;\n    min-width: 0;\n    display: flex;\n    flex-direction: column;\n    justify-content: center;\n    padding-top: 0.25rem;\n    color: var(--text-primary);\n}\n\n.loader_brand_2aDBh {\n    font-family: \"HarmonyOS Sans SC\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    font-weight: 700;\n    font-size: 2.4rem;\n    letter-spacing: -0.5px;\n    line-height: 1.1;\n    color: var(--text-primary);\n    margin-bottom: 0.4rem;\n}\n\n/* 正在加载的项目名：较长时省略号截断 */\n\n.loader_projectName_3E0Bc {\n    font-size: 1.05rem;\n    font-weight: 600;\n    color: var(--text-primary);\n    opacity: 0.85;\n    letter-spacing: -0.1px;\n    max-width: 260px;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n    margin-bottom: 0.55rem;\n}\n\n.loader_message_3siSl {\n    font-size: 0.95rem;\n    font-weight: 500;\n    color: var(--text-primary);\n    opacity: 0.72;\n    letter-spacing: 0.2px;\n    min-height: 22px;\n    font-variant-numeric: tabular-nums;\n}\n\n/* 进度条：变长，横跨整个卡片底部宽度并居中 */\n\n.loader_barOuter_2hVpS {\n    width: 100%;\n    height: 6px;\n    border-radius: 999px;\n    background-color: var(--ui-black-transparent);\n    overflow: hidden;\n    position: relative;\n}\n\n.loader_barInner_2bqNl {\n    position: absolute;\n    top: 0;\n    left: 0;\n    width: 0;\n    height: 100%;\n    border-radius: 999px;\n    /* 进度条颜色跟随文字色（currentColor 继承自 .right 的 var(--text-primary)）：\n       深色主题下为白色，浅色主题下为黑色 */\n    background-color: currentColor;\n    transition: width 0.25s ease;\n}\n\n/* 预计剩余时间：圆角矩形居中显示在进度条下方 */\n\n.loader_eta_26jQt {\n    align-self: center;\n    padding: 0.28rem 0.8rem;\n    border-radius: 999px;\n    background: var(--ui-black-transparent);\n    color: var(--text-primary);\n    font-size: 0.78rem;\n    font-weight: 500;\n    letter-spacing: 0.2px;\n    min-height: 1.1rem;\n    font-variant-numeric: tabular-nums;\n    transition: opacity 0.2s ease;\n}\n\n.loader_eta_26jQt:empty {\n    opacity: 0;\n    padding: 0;\n    min-height: 0;\n}\n", ""]);
+exports.push([module.i, "/* overridden by src/lib/themes/guiHelpers.js */\n\n/*\n    Contains constants for the z-index values of elements that are part of the global stack context.\n    In other words, z-index values that are \"inside\" a component are not added here.\n    This prevents conflicts between identical z-index values in different components.\n*/\n\n/* Toolbox z-index: 40; set in scratch-blocks */\n\n/* tooltips should go over add buttons if they overlap */\n\n/* monitors go over add buttons */\n\n/* \"ask\" block text input goes above monitors */\n\n/* menu-bar should go over monitors, alerts and tutorials */\n\n/* behind menu-bar */\n\n/* Block drag z-index: 1000; default 50 is overriden in blocks.css */\n\n/* so it is draggable into other panes */\n\n/* behind modals */\n\n/* behind modals */\n\n/* in most interfaces, the context menu is always on top */\n\n/* NeoWarp 自定义加载页样式：居中毛玻璃卡片 + 左右均分（粒子 Logo / 文案+进度条） */\n\n.loader_background_1rQeh {\n    position: absolute;\n    top: 0;\n    left: 0;\n    width: 100%;\n    height: 100%;\n    z-index: 490;\n    display: flex;\n    justify-content: center;\n    align-items: center;\n    /* 半透明遮罩 + 毛玻璃，不填满纯色；文字颜色跟随主题（深下白/浅下黑） */\n    background-color: rgba(0, 0, 0, 0.28);\n    backdrop-filter: blur(14px);\n    -webkit-backdrop-filter: blur(14px);\n    font-family: \"HarmonyOS Sans SC\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    text-align: left;\n    color: var(--text-primary);\n}\n\n.loader_fullscreen_3zX_z {\n    /* Break out of the layout using position: fixed to cover the whole screen */\n    position: fixed;\n    /* Use the fullscreen stage z-index to allow covering full-screen mode */\n    z-index: 500;\n}\n\n/* 居中卡片：不填充整个屏幕；纵向布局（上：左右两栏，下：整宽进度条） */\n\n.loader_card_1rvHl {\n    display: flex;\n    flex-direction: column;\n    align-items: stretch;\n    gap: 1.5rem;\n    padding: 2.75rem 3.25rem;\n    border-radius: 24px;\n    /* 浅色主题：白色半透明卡片；深色主题（默认变量）：深色半透明卡片 */\n    background: color-mix(in srgb, var(--ui-modal-background) 78%, transparent);\n    border: 0.5px solid var(--ui-black-transparent);\n    color: var(--text-primary);\n    box-shadow:\n        0 24px 70px rgba(0, 0, 0, 0.25),\n        0 0 0 0.5px var(--ui-black-transparent);\n    backdrop-filter: blur(28px) saturate(160%);\n    -webkit-backdrop-filter: blur(28px) saturate(160%);\n    max-width: 640px;\n    animation: loader_cardIn_1Pi5V 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;\n}\n\n/* 上排：左右两栏（粒子 Logo / 文案） */\n\n.loader_mainRow_Dl3xt {\n    display: flex;\n    flex-direction: row;\n    align-items: center;\n    gap: 2.5rem;\n}\n\n@keyframes loader_cardIn_1Pi5V {\n    from {\n        opacity: 0;\n        transform: translateY(14px) scale(0.97);\n    }\n    to {\n        opacity: 1;\n        transform: translateY(0) scale(1);\n    }\n}\n\n.loader_left_3Hh4t {\n    flex: 0 0 auto;\n    display: flex;\n    align-items: flex-start;\n    justify-content: center;\n}\n\n.loader_particleCanvas_pnaYo {\n    display: block;\n    width: 260px;\n    height: 260px;\n}\n\n.loader_right_245wf {\n    flex: 1 1 auto;\n    min-width: 0;\n    display: flex;\n    flex-direction: column;\n    justify-content: center;\n    padding-top: 0.25rem;\n    color: var(--text-primary);\n}\n\n.loader_brand_2aDBh {\n    font-family: \"HarmonyOS Sans SC\", \"Helvetica Neue\", Helvetica, Arial, sans-serif;\n    font-weight: 700;\n    font-size: 2.4rem;\n    letter-spacing: -0.5px;\n    line-height: 1.1;\n    color: var(--text-primary);\n    margin-bottom: 0.4rem;\n}\n\n/* 正在加载的项目名：较长时省略号截断 */\n\n.loader_projectName_3E0Bc {\n    font-size: 1.05rem;\n    font-weight: 600;\n    color: var(--text-primary);\n    opacity: 0.85;\n    letter-spacing: -0.1px;\n    max-width: 260px;\n    overflow: hidden;\n    text-overflow: ellipsis;\n    white-space: nowrap;\n    margin-bottom: 0.55rem;\n}\n\n.loader_message_3siSl {\n    font-size: 0.95rem;\n    font-weight: 500;\n    color: var(--text-primary);\n    opacity: 0.72;\n    letter-spacing: 0.2px;\n    min-height: 22px;\n    font-variant-numeric: tabular-nums;\n}\n\n/* 进度条：变长，横跨整个卡片底部宽度并居中 */\n\n.loader_barOuter_2hVpS {\n    width: 100%;\n    height: 6px;\n    border-radius: 999px;\n    background-color: var(--ui-black-transparent);\n    overflow: hidden;\n    position: relative;\n}\n\n.loader_barInner_2bqNl {\n    position: absolute;\n    top: 0;\n    left: 0;\n    width: 0;\n    height: 100%;\n    border-radius: 999px;\n    /* 进度条颜色跟随文字色（currentColor 继承自 .right 的 var(--text-primary)）：\n       深色主题下为白色，浅色主题下为黑色 */\n    background-color: currentColor;\n    transition: width 0.25s ease;\n}\n\n/* 预计剩余时间：圆角矩形居中显示在进度条下方 */\n\n.loader_eta_26jQt {\n    align-self: center;\n    padding: 0.28rem 0.8rem;\n    border-radius: 999px;\n    background: var(--ui-black-transparent);\n    color: var(--text-primary);\n    font-size: 0.78rem;\n    font-weight: 500;\n    letter-spacing: 0.2px;\n    min-height: 1.1rem;\n    font-variant-numeric: tabular-nums;\n    transition: opacity 0.2s ease;\n}\n\n.loader_eta_26jQt:empty {\n    opacity: 0;\n    padding: 0;\n    min-height: 0;\n}\n\n/* ===== NeoWarp: 开屏全屏化（不透明 / 无圆角卡片 / 粒子全屏，竖屏横屏通用） ===== */\n.loader_background_1rQeh,\n.loader_background_1rQeh.loader_fullscreen_3zX_z {\n    --nw-bar-bottom: clamp(40px, 12vh, 96px);\n    position: fixed !important;\n    top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;\n    width: 100vw !important; height: 100vh !important;\n    z-index: 500 !important;\n    display: block !important;\n    background-color: var(--ui-modal-background, #0f1115) !important;\n    background-image: none !important;\n    backdrop-filter: none !important;\n    -webkit-backdrop-filter: none !important;\n    opacity: 1 !important;\n}\n.loader_card_1rvHl {\n    position: static !important;\n    width: 100% !important; height: 100% !important;\n    max-width: none !important;\n    margin: 0 !important; padding: 0 !important; gap: 0 !important;\n    border: 0 !important; border-radius: 0 !important; box-shadow: none !important;\n    background: transparent !important;\n    backdrop-filter: none !important; -webkit-backdrop-filter: none !important;\n    animation: none !important; transform: none !important;\n    display: block !important;\n}\n.loader_mainRow_Dl3xt,\n.loader_left_3Hh4t {\n    position: static !important; display: block !important;\n    width: 100% !important; height: 100% !important;\n    gap: 0 !important; margin: 0 !important; padding: 0 !important;\n}\n.loader_particleCanvas_pnaYo {\n    position: fixed !important;\n    top: 0 !important; left: 0 !important;\n    width: 100vw !important; height: 100vh !important;\n    max-width: none !important; max-height: none !important;\n    z-index: 0 !important; display: block !important;\n}\n.loader_right_245wf {\n    position: fixed !important;\n    left: 0 !important; right: 0 !important; top: auto !important; bottom: 19% !important;\n    height: auto !important; min-width: 0 !important;\n    padding: 0 24px !important; margin: 0 !important;\n    z-index: 2 !important;\n    display: flex !important; flex-direction: column !important;\n    align-items: center !important; justify-content: center !important;\n    text-align: center !important;\n}\n.loader_brand_2aDBh { text-align: center !important; font-size: 2rem !important; margin: 0 0 .3rem !important; }\n.loader_projectName_3E0Bc { max-width: 86vw !important; text-align: center !important; margin: 0 0 .4rem !important; }\n.loader_message_3siSl { text-align: center !important; }\n.loader_barOuter_2hVpS {\n    position: fixed !important;\n    left: 0 !important; right: 0 !important; top: auto !important;\n    bottom: var(--nw-bar-bottom) !important;\n    width: min(72vw, 460px) !important; height: 6px !important;\n    margin: 0 auto !important; padding: 0 !important;\n    z-index: 2 !important;\n    overflow: visible !important;\n    background-color: rgba(127, 127, 127, 0.30) !important;\n    border-radius: 999px !important;\n}\n.loader_barInner_2bqNl { background-color: var(--text-primary, #fff) !important; }\n.loader_eta_26jQt {\n    position: fixed !important;\n    left: 0 !important; right: 0 !important; top: auto !important;\n    bottom: calc(var(--nw-bar-bottom) - 33px) !important;\n    width: max-content !important; max-width: 86vw !important;\n    margin: 0 auto !important; padding: 0.28rem 0.8rem !important;\n    z-index: 2 !important; text-align: center !important;\n}\n/* 横屏：左右分栏（粒子 Logo 居左、文字与进度条居右），避免文字压 Logo */\n@media (orientation: landscape) and (max-height: 520px) {\n    .loader_background_1rQeh,\n    .loader_background_1rQeh.loader_fullscreen_3zX_z { --nw-bar-bottom: clamp(46px, 20vh, 96px); }\n    .loader_right_245wf {\n        left: 52% !important; right: 0 !important;\n        top: 50% !important; bottom: auto !important;\n        transform: translateY(-50%) !important;\n        align-items: flex-start !important; text-align: left !important;\n        padding: 0 24px 0 0 !important;\n    }\n    .loader_brand_2aDBh, .loader_projectName_3E0Bc, .loader_message_3siSl { text-align: left !important; }\n    .loader_barOuter_2hVpS {\n        left: 52% !important; right: auto !important; margin: 0 !important;\n        width: min(38vw, 300px) !important;\n    }\n    .loader_eta_26jQt {\n        left: 52% !important; right: auto !important; margin: 0 !important;\n    }\n}", ""]);
 
 // exports
 exports.locals = {
@@ -134988,11 +134988,50 @@ class LoaderComponent extends react__WEBPACK_IMPORTED_MODULE_0___default.a.Compo
     this.props.vm.on('ASSET_PROGRESS', this.handleAssetProgress);
     this.props.vm.runtime.on('PROJECT_LOADED', this.handleProjectLoaded);
     this.initParticles();
+    this._onResize = () => {
+      if (this._resizeTimer) clearTimeout(this._resizeTimer);
+      this._resizeTimer = setTimeout(() => {
+        this.resizeCanvas();
+        if (this.particles && this.particles.length) this.relayoutParticles();
+      }, 150);
+    };
+    window.addEventListener('resize', this._onResize);
+    window.addEventListener('orientationchange', this._onResize);
   }
   componentWillUnmount() {
     this.props.vm.off('ASSET_PROGRESS', this.handleAssetProgress);
     this.props.vm.runtime.off('PROJECT_LOADED', this.handleProjectLoaded);
     if (this.rafId) cancelAnimationFrame(this.rafId);
+    if (this._resizeTimer) clearTimeout(this._resizeTimer);
+    if (this._onResize) {
+      window.removeEventListener('resize', this._onResize);
+      window.removeEventListener('orientationchange', this._onResize);
+    }
+  }
+  relayoutParticles() {
+    const canvas = this.canvasEl;
+    if (!canvas || !this._chosen) return;
+    const W = canvas.width;
+    const H = canvas.height;
+    const dpr = window.devicePixelRatio || 1;
+    const landscape = W > H;
+    const logoCss = Math.min(W / dpr, H / dpr) * (landscape ? 0.55 : 0.5);
+    const scale = logoCss * dpr / PARTICLE_SIZE;
+    const logoPx = PARTICLE_SIZE * scale;
+    const offX = landscape ? W * 0.26 - logoPx / 2 : (W - logoPx) / 2;
+    const offY = (H - logoPx) / 2;
+    const dotScale = Math.max(1, Math.min(scale, 1.8));
+    this.particles.forEach((pt, i) => {
+      const p = this._chosen[i];
+      if (!p) return;
+      pt.tx = offX + p.x * scale;
+      pt.ty = offY + p.y * scale;
+      pt.s = (1 + (p.r + p.g + p.b) / 765 * 2.2) * dotScale;
+    });
+    if (this.ambient) for (const a of this.ambient) {
+      a.x = Math.random() * W;
+      a.y = Math.random() * H;
+    }
   }
   initParticles() {
     const canvas = this.canvasEl;
@@ -135040,23 +135079,44 @@ class LoaderComponent extends react__WEBPACK_IMPORTED_MODULE_0___default.a.Compo
           chosen.push(pts[Math.floor(Math.random() * pts.length)]);
         }
       }
-      const size = canvas.width;
-      const scale = size / PARTICLE_SIZE;
+      this._chosen = chosen;
+      const W = canvas.width;
+      const H = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      const landscape = W > H;
+      const logoCss = Math.min(W / dpr, H / dpr) * (landscape ? 0.55 : 0.5);
+      const scale = logoCss * dpr / PARTICLE_SIZE;
+      const logoPx = PARTICLE_SIZE * scale;
+      const offX = landscape ? W * 0.26 - logoPx / 2 : (W - logoPx) / 2;
+      const offY = (H - logoPx) / 2;
+      const dotScale = Math.max(1, Math.min(scale, 1.8));
       this.particles = chosen.map(p => ({
-        tx: p.x * scale,
-        ty: p.y * scale,
-        x: Math.random() * size,
-        y: Math.random() * size,
+        tx: offX + p.x * scale,
+        ty: offY + p.y * scale,
+        x: Math.random() * W,
+        y: Math.random() * H,
         phase: Math.random() * Math.PI * 2,
         speed: 0.6 + Math.random() * 0.8,
-        amp: 1.5 + Math.random() * 2.5,
+        amp: (1.5 + Math.random() * 2.5) * dpr,
         r: p.r,
         g: p.g,
         b: p.b,
-        s: 1 + (p.r + p.g + p.b) / 765 * 2.2,
+        s: (1 + (p.r + p.g + p.b) / 765 * 2.2) * dotScale,
         prog: 0,
         delay: Math.random() * 0.4
       }));
+      /* 常驻全屏背景粒子：始终铺满视口、缓慢漂浮，任意时刻都是全屏粒子场 */
+      this.ambient = [];
+      for (let i = 0; i < 200; i++) {
+        this.ambient.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          s: (0.8 + Math.random() * 1.4) * dpr,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.25 + Math.random() * 0.5,
+          alpha: 0.12 + Math.random() * 0.20
+        });
+      }
       this.startTime = performance.now();
       this.animate();
     };
@@ -135065,18 +135125,27 @@ class LoaderComponent extends react__WEBPACK_IMPORTED_MODULE_0___default.a.Compo
     const canvas = this.canvasEl;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const size = canvas.width;
     const frame = now => {
+      const W = canvas.width;
+      const H = canvas.height;
       const elapsed = (now - this.startTime) / 1000;
-      ctx.clearRect(0, 0, size, size);
-      const cx = size / 2;
-      const cy = size / 2;
-      const glowR = size * 0.42;
+      ctx.clearRect(0, 0, W, H);
+      const cx = W / 2;
+      const cy = H / 2;
+      const glowR = Math.min(W, H) * 0.5;
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
       grad.addColorStop(0, 'rgba(90, 140, 255, 0.10)');
       grad.addColorStop(1, 'rgba(90, 140, 255, 0)');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, size, size);
+      ctx.fillRect(0, 0, W, H);
+      for (const a of (this.ambient || [])) {
+        const ax = a.x + Math.sin(elapsed * a.speed + a.phase) * 12;
+        const ay = a.y + Math.cos(elapsed * a.speed * 0.8 + a.phase) * 12;
+        ctx.beginPath();
+        ctx.arc(ax, ay, a.s, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(150,180,255,".concat(a.alpha, ")");
+        ctx.fill();
+      }
       for (const p of this.particles) {
         if (p.prog < 1) {
           const local = Math.max(0, (elapsed - p.delay) / 1.4);
@@ -135171,14 +135240,18 @@ class LoaderComponent extends react__WEBPACK_IMPORTED_MODULE_0___default.a.Compo
   }
   canvasRef(c) {
     this.canvasEl = c;
-    if (c) {
-      const dpr = window.devicePixelRatio || 1;
-      const cssSize = 260;
-      c.style.width = "".concat(cssSize, "px");
-      c.style.height = "".concat(cssSize, "px");
-      c.width = cssSize * dpr;
-      c.height = cssSize * dpr;
-    }
+    if (c) this.resizeCanvas();
+  }
+  resizeCanvas() {
+    const c = this.canvasEl;
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
+    c.style.width = "".concat(w, "px");
+    c.style.height = "".concat(h, "px");
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
   }
   render() {
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0___default.a.createElement("div", {

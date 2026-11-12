@@ -4,7 +4,7 @@ NeoWarp 桌面版（Electron / TurboWarp fork）的 Android 移植。APK 内置�
 用 Capacitor 6 工程结构 + 自研 Java 桥替代 Electron 主进程，页面代码零改动。
 
 - 应用名：**NeoWarp**（`org.neowarp.android`）
-- 版本：**2.0.0**（versionCode 200）
+- 版本：**0.0.1**（versionCode 1）
 - 启动行为：打开 APK 直接进入主页（home.html），与桌面版无参启动一致
 - 图标：`art/icon.png` 生成全密度 mipmap + 自适应图标（foreground/background）
 - 全面屏：`resizeableActivity` + `maxAspectRatio=3.0` + 刘海区 `shortEdges` 绘制

@@ -1826,7 +1826,7 @@
   if (WIN_TYPE === 'home') {
     window.HomePreload = {
       // 兜底对象：sync 失败也不让页面初始化脚本崩掉
-      getInfo: function () { var v = sync('homeGetInfo'); return v || { locale: 'zh-CN', version: '2.3.0' }; },
+      getInfo: function () { var v = sync('homeGetInfo'); return v || { locale: 'zh-CN', version: '0.0.1' }; },
       getAvailableUpdate: function () { return inv('getAvailableUpdate'); },
       onUpdateAvailable: function (callback) { on('home', 'update-available', callback); },
       getTheme: function () { return inv('getTheme'); },
@@ -1856,7 +1856,7 @@
     window.OnboardingPreload = {
       getInfo: function () {
         var v = sync('onboardingGetInfo');
-        return v || { locale: 'zh-CN', uiTheme: 'system', version: '2.3.0', logo: null };
+        return v || { locale: 'zh-CN', uiTheme: 'system', version: '0.0.1', logo: null };
       },
       getTheme: function () { return inv('getTheme'); },
       themeApplied: function (theme) { return inv('themeApplied', { theme: theme }); },
@@ -1873,7 +1873,7 @@
    * 7. 其余窗口 Preload
    * ============================================================ */
   if (WIN_TYPE === 'about') {
-    window.AboutPreload = { getInfo: function () { var v = sync('aboutGetInfo'); return v || { version: '2.3.0', electron: '', chrome: '' }; } };
+    window.AboutPreload = { getInfo: function () { var v = sync('aboutGetInfo'); return v || { version: '0.0.1', electron: '', chrome: '' }; } };
   }
 
   if (WIN_TYPE === 'privacy') {
