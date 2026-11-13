@@ -27,6 +27,9 @@ public class MainActivity extends BridgeActivity {
             BridgeHub.get(this).setPendingInitialFile(intent.getData());
         }
 
+        // 每天第一次打开软件时后台检查一次更新（同日再次启动自动跳过）
+        BridgeHub.get(this).checkForUpdatesOnStartup();
+
         WindowActivity.show(this, "home", null);
         finish();
     }

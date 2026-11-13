@@ -1529,24 +1529,6 @@
                 </label>
               </div>
             </div>
-            <!-- NeoWarp: 顶栏设备占用（CPU/内存）显示开关。开启后编辑器
-                 顶栏实时显示 CPU 与内存占用；开关即时广播，顶栏 flex
-                 布局自动重新居中，无需重启编辑器。 -->
-            <div class="setting-row">
-              <div class="row-icon icon-indigo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line></svg>
-              </div>
-              <div class="setting-info">
-                <div class="setting-label top-bar-device-stats-label"></div>
-                <div class="setting-desc top-bar-device-stats-desc"></div>
-              </div>
-              <div class="setting-control">
-                <label class="toggle">
-                  <input type="checkbox" class="top-bar-device-stats-checkbox" autocomplete="off">
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
             <!-- NeoWarp: 编辑器右键菜单毛玻璃效果开关。开启后积木区右键
                  菜单使用半透明背景 + 模糊；即时广播到所有编辑器窗口。 -->
             <div class="setting-row">
@@ -1932,7 +1914,8 @@
       const checkUpdateDesc = document.querySelector('.check-update-desc');
 
       checkUpdateLabel.textContent = strings['desktop-settings.check-for-updates'] || '检查更新';
-      checkUpdateDesc.textContent = strings['desktop-settings.check-for-updates-desc'] || '从 GitHub 手动检查最新版本';
+      checkUpdateDesc.textContent = strings['desktop-settings.update-source']
+        || '每天第一次打开软件自动检查 · 更新源：NeoWarpEditor/NeoWarp-for-Android';
       checkBtnText.textContent = strings['desktop-settings.check-now'] || '立即检查';
 
       let isChecking = false;
@@ -2279,34 +2262,43 @@
         }
       }
 
-      // ===== Update checker frequency =====
+      // ===== 检查更新频率 =====
+      // Android 版固定为「每天第一次打开软件时检查一次」，这里只保留开关。
+      // 不再沿用桌面版的更新通道下拉（unstable/stable/security/never）——
+      // 那组值写进设置会导致 Java 侧 getBoolean 类型冲突、下拉显示为空。
       const updateCheckerRow = document.getElementById('updateCheckerRow');
       const updateCheckerSelect = document.querySelector('.update-checker-select');
       const updateCheckerWarning = document.querySelector('.update-checker-warning');
-      if (settings.updateCheckerAllowed) {
-        document.querySelector('.update-checker-label').textContent = strings['desktop-settings.update-checker'];
-        const updateCheckerWidget = new CustomSelect(updateCheckerSelect);
-        const updateCheckerValues = ['unstable', 'stable', 'security', 'never'];
-        updateCheckerWidget.setOptions(updateCheckerValues.map((value) => ({
-          value,
-          label: strings[`desktop-settings.notify-${value}`]
-        })));
-        updateCheckerSelect.value = settings.updateChecker;
-        updateCheckerWarning.textContent = strings['desktop-settings.disabled-updates'];
-        updateCheckerWarning.hidden = settings.updateChecker !== 'never';
-        updateCheckerSelect.onchange = () => {
-          DesktopSettingsPreload.setUpdateChecker(updateCheckerSelect.value);
-          updateCheckerWarning.hidden = updateCheckerSelect.value !== 'never';
-        };
-      } else {
-        const label = updateCheckerRow.querySelector('.setting-label');
-        label.textContent = strings['desktop-settings.update-checker'];
-        const note = document.createElement('div');
-        note.className = 'setting-desc';
-        note.textContent = strings['desktop-settings.update-checker-not-allowed'];
-        label.parentElement.appendChild(note);
-        updateCheckerRow.querySelector('.setting-control').remove();
+      const updateCheckerLabel = document.querySelector('.update-checker-label');
+      updateCheckerLabel.textContent = strings['desktop-settings.update-frequency'] || '自动检查更新';
+      const freqInfo = updateCheckerLabel.parentElement;
+      let freqDesc = freqInfo.querySelector('.setting-desc');
+      if (!freqDesc) {
+        freqDesc = document.createElement('div');
+        freqDesc.className = 'setting-desc';
+        freqInfo.appendChild(freqDesc);
       }
+      freqDesc.textContent = strings['desktop-settings.update-frequency-desc']
+        || '每天第一次打开软件时自动检查一次，也可在上方手动立即检查';
+
+      const updateCheckerWidget = new CustomSelect(updateCheckerSelect);
+      updateCheckerWidget.setOptions([
+        { value: 'daily', label: strings['desktop-settings.update-frequency-daily'] || '每天首次打开' },
+        { value: 'manual', label: strings['desktop-settings.update-frequency-manual'] || '仅手动检查' }
+      ]);
+      const autoCheckEnabled = settings.updateChecker !== false
+        && settings.updateChecker !== 'never'
+        && settings.updateChecker !== 'manual';
+      updateCheckerSelect.value = autoCheckEnabled ? 'daily' : 'manual';
+      updateCheckerWarning.textContent = strings['desktop-settings.update-frequency-off-warning']
+        || '关闭后不会自动收到新版本提醒，仍可手动检查。';
+      updateCheckerWarning.hidden = autoCheckEnabled;
+      updateCheckerSelect.onchange = () => {
+        const enabled = updateCheckerSelect.value !== 'manual';
+        // 传布尔值，Java 侧 setSettingValue 会写成 Boolean，与 getBoolean 一致
+        DesktopSettingsPreload.setUpdateChecker(enabled);
+        updateCheckerWarning.hidden = enabled;
+      };
 
       // ===== UI theme =====
       const uiThemeSegments = Array.from(document.querySelectorAll('#uiThemeSegmented .segment'));
@@ -2339,10 +2331,10 @@
           segment.classList.toggle('selected', segment.dataset.value === value);
         }
       };
-      document.querySelector('.editor-layout-label').textContent = strings['desktop-settings.editor-layout'];
-      document.querySelector('.editor-layout-desc').textContent = strings['desktop-settings.editor-layout-desc'];
+      document.querySelector('.editor-layout-label').textContent = strings['desktop-settings.editor-layout'] || '编辑器排列方式';
+      document.querySelector('.editor-layout-desc').textContent = strings['desktop-settings.editor-layout-desc'] || '竖屏下代码列表与代码放置区的排列方式，切换即时生效';
       for (const segment of editorLayoutSegments) {
-        segment.textContent = strings[`desktop-settings.editor-layout-${segment.dataset.value}`];
+        segment.textContent = strings[`desktop-settings.editor-layout-${segment.dataset.value}`] || (segment.dataset.value === 'vertical' ? '纵向' : '横向');
       }
       setEditorLayoutSelection(settings.editorLayout || 'horizontal');
       for (const segment of editorLayoutSegments) {
@@ -2401,18 +2393,6 @@
           applyCompactWindowStyleControls(compactWindowStyleCheckbox.checked);
         };
       }
-
-      // ===== 顶栏设备占用（CPU/内存）显示 =====
-      // 保存后由主进程广播给所有编辑器窗口，编辑器顶栏（menu-bar）
-      // 实时移除/恢复「CPU/内存」块，flex 布局自动重新居中，无需
-      // 重启编辑器。默认开启（与旧行为一致），关闭仅隐藏指示块。
-      const topBarDeviceStatsCheckbox = document.querySelector('.top-bar-device-stats-checkbox');
-      document.querySelector('.top-bar-device-stats-label').textContent = strings['desktop-settings.top-bar-device-stats'];
-      document.querySelector('.top-bar-device-stats-desc').textContent = strings['desktop-settings.top-bar-device-stats-desc'];
-      topBarDeviceStatsCheckbox.checked = settings.topBarDeviceStats === true;
-      topBarDeviceStatsCheckbox.onchange = () => {
-        DesktopSettingsPreload.setTopBarDeviceStats(topBarDeviceStatsCheckbox.checked);
-      };
 
       // ===== 右键菜单毛玻璃效果 =====
       // 保存后由主进程广播给所有编辑器窗口，编辑器在 <html> 上写

@@ -57,6 +57,17 @@ public class BridgeHub {
     private static final String RECENT_PREF = "nw-recent";
     private static final int MAX_RECENT = 10;
 
+    /* ---------------- 检查更新（GitHub Release） ---------------- */
+    /** 更新源仓库 */
+    public static final String UPDATE_REPO = "NeoWarpEditor/NeoWarp-for-Android";
+    // 用列表而非 /releases/latest：后者只认正式版，仓库首发为 prerelease 时会 404
+    private static final String UPDATE_API_URL =
+            "https://api.github.com/repos/" + UPDATE_REPO + "/releases?per_page=20";
+    public static final String UPDATE_RELEASES_URL =
+            "https://github.com/" + UPDATE_REPO + "/releases";
+    private static final String PREF_LAST_UPDATE_CHECK = "lastUpdateCheckDate";
+    private static final String PREF_AVAILABLE_UPDATE = "availableUpdate";
+
     private static BridgeHub instance;
 
     public static synchronized BridgeHub get(Context ctx) {
@@ -611,9 +622,9 @@ public class BridgeHub {
                 return;
             }
             case "checkForUpdates": {
-                JSONObject o = new JSONObject();
-                o.put("updateAvailable", false);
-                reply(cbId, o.toString());
+                // 设置页「立即检查」：网络请求放后台线程，结果回投仍走 reply
+                new Thread(() -> reply(cbId, performUpdateCheck().toString()),
+                        "nw-update-manual").start();
                 return;
             }
             case "enumerateMediaDevices": {
@@ -1169,7 +1180,8 @@ public class BridgeHub {
 
             /* --- 更新检测（Android 走应用内检查，无自动下载） --- */
             case "getAvailableUpdate": {
-                reply(cbId, jstr(null));
+                JSONObject u = availableUpdate();
+                reply(cbId, u == null ? "null" : u.toString());
                 return;
             }
 
@@ -2005,6 +2017,173 @@ public class BridgeHub {
         } catch (Exception e) {
             return "0.0.1";
         }
+    }
+
+    /* ============================================================
+     * 检查更新
+     *   仓库：NeoWarpEditor/NeoWarp-for-Android
+     *   频率：每天第一次打开软件时自动检查一次；设置页「立即检查」不受限制
+     * ============================================================ */
+
+    /** 本地时区的日期键 yyyy-MM-dd，用于「每天一次」门控 */
+    private static String todayKey() {
+        return new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+                .format(new java.util.Date());
+    }
+
+    private static String normalizeVersion(String v) {
+        if (v == null) return "0";
+        String s = v.trim();
+        if (s.startsWith("v") || s.startsWith("V")) s = s.substring(1);
+        int dash = s.indexOf('-');
+        if (dash >= 0) s = s.substring(0, dash);
+        int plus = s.indexOf('+');
+        if (plus >= 0) s = s.substring(0, plus);
+        return s.isEmpty() ? "0" : s;
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            String digits = s.replaceAll("[^0-9]", "");
+            return digits.isEmpty() ? 0 : Integer.parseInt(digits);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    /** 语义化版本比较：latest 比 current 新时返回 true */
+    private static boolean isNewerVersion(String current, String latest) {
+        String[] a = normalizeVersion(current).split("\\.");
+        String[] b = normalizeVersion(latest).split("\\.");
+        int n = Math.max(a.length, b.length);
+        for (int i = 0; i < n; i++) {
+            int x = i < a.length ? parseIntSafe(a[i]) : 0;
+            int y = i < b.length ? parseIntSafe(b[i]) : 0;
+            if (y != x) return y > x;
+        }
+        return false;
+    }
+
+    private String fetchJson(String urlStr) throws Exception {
+        HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+        try {
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(15000);
+            conn.setInstanceFollowRedirects(true);
+            conn.setRequestProperty("Accept", "application/vnd.github+json");
+            conn.setRequestProperty("User-Agent", "NeoWarp/" + versionName() + " (Android)");
+            int code = conn.getResponseCode();
+            if (code != 200) throw new IOException("HTTP " + code);
+            InputStream is = conn.getInputStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[4096];
+            int n;
+            while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+            is.close();
+            return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    /** 读取 Release 列表，取版本号最大的非草稿发布（正式版与预发布均可） */
+    private JSONObject fetchLatestRelease() throws Exception {
+        JSONArray releases = new JSONArray(fetchJson(UPDATE_API_URL));
+        JSONObject best = null;
+        String bestVersion = "";
+        for (int i = 0; i < releases.length(); i++) {
+            JSONObject j = releases.optJSONObject(i);
+            if (j == null || j.optBoolean("draft", false)) continue;
+            String tag = j.optString("tag_name", "");
+            if (tag.isEmpty()) continue;
+            String v = normalizeVersion(tag);
+            if (best == null || isNewerVersion(bestVersion, v)) {
+                best = j;
+                bestVersion = v;
+            }
+        }
+        if (best == null) throw new IOException("仓库暂无 Release");
+        return new JSONObject()
+                .put("version", bestVersion)
+                .put("url", best.optString("html_url", UPDATE_RELEASES_URL))
+                .put("notes", best.optString("body", ""));
+    }
+
+    /** 已检测到的新版本（首页胶囊读取），无则 null */
+    private JSONObject availableUpdate() {
+        String raw = settings().getString(PREF_AVAILABLE_UPDATE, "");
+        if (raw == null || raw.isEmpty()) return null;
+        try {
+            JSONObject o = new JSONObject(raw);
+            return o.optString("version", "").isEmpty() ? null : o;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void setAvailableUpdate(String version, String url) {
+        try {
+            settings().edit().putString(PREF_AVAILABLE_UPDATE,
+                    new JSONObject().put("version", version).put("url", url).toString()).apply();
+        } catch (Exception ignored) {}
+        broadcastAvailableUpdate();
+    }
+
+    private void clearAvailableUpdate() {
+        settings().edit().remove(PREF_AVAILABLE_UPDATE).apply();
+        broadcastAvailableUpdate();
+    }
+
+    /** 广播给首页；__nw.evt 第三参数必须是 JSON 字符串，故用 jq 包一层 */
+    private void broadcastAvailableUpdate() {
+        JSONObject u = availableUpdate();
+        final String payload = u == null ? "null" : u.toString();
+        main.post(() -> {
+            NWActivity w = findFirstByType("home");
+            if (w != null) {
+                w.evaluateJs("__nw.evt('home','update-available'," + jq(payload) + ")");
+            }
+        });
+    }
+
+    /** 执行一次检查：返回设置页所需字段，并同步首页胶囊 */
+    private JSONObject performUpdateCheck() {
+        JSONObject result = new JSONObject();
+        String current = versionName();
+        try {
+            result.put("currentVersion", current);
+            JSONObject latest = fetchLatestRelease();
+            String lv = latest.getString("version");
+            String url = latest.optString("url", UPDATE_RELEASES_URL);
+            result.put("latestVersion", lv);
+            result.put("releaseUrl", url);
+            result.put("releaseNotes", latest.optString("notes", ""));
+            boolean hasUpdate = isNewerVersion(current, lv);
+            result.put("hasUpdate", hasUpdate);
+            if (hasUpdate) setAvailableUpdate(lv, url);
+            else clearAvailableUpdate();
+        } catch (Exception e) {
+            try {
+                result.put("hasUpdate", false);
+                result.put("error", e.getMessage() == null ? "网络请求失败" : e.getMessage());
+            } catch (Exception ignored) {}
+        }
+        return result;
+    }
+
+    /**
+     * 每天第一次打开软件时自动检查一次更新。
+     * 由 MainActivity.onCreate 调用；同一天内再次启动直接跳过。
+     * 设置里关闭「自动检查」时不执行；设置页手动「立即检查」不受此限制。
+     */
+    public void checkForUpdatesOnStartup() {
+        try {
+            if (!settings().getBoolean("updateChecker", true)) return;
+            String today = todayKey();
+            if (today.equals(settings().getString(PREF_LAST_UPDATE_CHECK, ""))) return;
+            settings().edit().putString(PREF_LAST_UPDATE_CHECK, today).apply();
+            new Thread(() -> performUpdateCheck(), "nw-update-daily").start();
+        } catch (Exception ignored) {}
     }
 
     private String activeProjectTitle() {

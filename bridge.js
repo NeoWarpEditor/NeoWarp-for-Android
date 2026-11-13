@@ -2033,7 +2033,6 @@
       openUserData: function () { return inv('openUserData'); },
       setCodeAreaBackgroundImage: function (v) { return inv('setSetting', { key: 'codeAreaBackgroundImage', value: v }); },
       setStageAreaBackgroundImage: function (v) { return inv('setSetting', { key: 'stageAreaBackgroundImage', value: v }); },
-      setTopBarDeviceStats: function (v) { return inv('setSetting', { key: 'topBarDeviceStats', value: v }); },
       // 2.3.0 新增设置项
       setToolbarHeight: function (v) { return inv('setSetting', { key: 'toolbarHeight', value: v }); },
       setCompactWindowStyle: function (v) { return inv('setSetting', { key: 'compactWindowStyle', value: v }); },
