@@ -298,17 +298,34 @@
           + '#toast{bottom:calc(48px + var(--nw-sab)) !important}';
       }
       if (WIN_TYPE === 'image-editor') {
-        // 竖屏适配：工具栏转横排、属性面板转底部面板、顶栏换行
+        // 竖屏适配：菜单栏单行横排可滚动（此前 8 个菜单项被压成一字一行竖排）、
+        // 工具栏转横排、属性面板转底部面板、颜色面板紧凑化给画布让位
         css += '@media (max-width:620px){'
+          + '.menubar{flex-wrap:nowrap !important;overflow-x:auto !important;overflow-y:hidden !important;'
+          + 'height:34px !important;-webkit-overflow-scrolling:touch}'
+          + '.menu-root{white-space:nowrap !important;flex:0 0 auto !important;height:26px !important;'
+          + 'padding:0 9px !important;font-size:12px !important}'
+          + '.menubar .brand{flex:0 0 auto !important;margin-left:auto !important;'
+          + 'padding-right:6px !important;gap:4px !important}'
+          + '.menubar .brand b{font-size:11.5px !important}'
+          + '.menubar .brand #doc-title{display:none !important}'
+          + '.menubar-btn span{display:none !important}'
+          + '.menubar-btn{padding:4px !important}'
           + '.topbar{flex-wrap:wrap;row-gap:4px;padding:6px 8px !important}'
           + '.main{flex-direction:column !important}'
           + '.toolbar{width:auto !important;height:52px;flex-direction:row !important;'
           + 'border-right:none !important;border-bottom:1px solid var(--border);'
           + 'overflow-x:auto;overflow-y:hidden;padding:6px !important;gap:6px !important}'
           + '.tool-sep{width:1px !important;height:28px;flex-shrink:0}'
-          + '.side-panel{width:auto !important;max-height:46%;flex:0 0 auto;'
+          + '.side-panel{width:auto !important;max-height:40%;flex:0 0 auto;'
           + 'border-left:none !important;border-top:1px solid var(--border)}'
           + '.canvas-wrap{min-height:0 !important}'
+          /* 颜色面板紧凑化：SV/色相条压扁、色板限高内部滚动。
+             取色按 getBoundingClientRect 归一化，CSS 缩放不影响精度 */
+          + '#sv-canvas{width:auto !important;height:104px !important;max-width:100% !important}'
+          + '#hue-slider{width:auto !important;height:104px !important}'
+          + '.swatch-grid{grid-template-columns:repeat(auto-fill,minmax(26px,1fr)) !important;'
+          + 'max-height:116px !important;overflow-y:auto !important;-webkit-overflow-scrolling:touch}'
           + '}';
       }
       if (WIN_TYPE === 'desktop-settings') {
@@ -473,10 +490,13 @@
         P + '#app, ' + P + '[class*="gui_page-wrapper_"]{min-width:0 !important;min-height:0 !important;'
           + 'width:100% !important;height:100% !important}',
 
-        /* (2) 顶部工具栏移到底部、仅显示图标、横向可滑动 */
+        /* (2) 顶部工具栏移到底部、仅显示图标、横向可滑动。
+           z-index 必须 ≥ 扩展按钮（fixed 60 / 原生 42）：menu-bar 下拉菜单
+           挂在 menu-bar 子树内，menu-bar 层级低于扩展按钮时菜单整体被压到
+           扩展按键下面（用户反馈「下拉菜单跑到扩展按键下面」）。 */
         P + '[class*="gui_body-wrapper_"]{order:1;flex:1 1 auto !important;min-height:0 !important;height:auto !important}',
         P + '[class*="gui_menu-bar-position_"]{order:2;position:relative !important;'
-          + 'flex:0 0 auto !important;z-index:40}',
+          + 'flex:0 0 auto !important;z-index:100}',
         P + '[class*="menu-bar_menu-bar_"]{height:var(--nw-menu-h) !important;'
           + 'min-height:var(--nw-menu-h) !important;box-sizing:border-box;font-size:0 !important;'
           + 'overflow-x:hidden !important;overflow-y:hidden !important;flex-wrap:nowrap !important;'
@@ -2162,6 +2182,18 @@
       reportPopoutState: function (state) { return inv('extReportPopoutState', { state: state }); },
       dockBack: function () { return inv('extDockBack'); }
     };
+    // Android WebView：软键盘只认「触摸手势同步调用栈内」的焦点变化。
+    // monaco 隐形 textarea 的焦点在部分内核上收不到手势授权，表现为
+    // 点代码区光标在动但输入法不弹。touchstart 捕获阶段补一次同步 focus
+    // （monaco 随后的 pointerdown 只负责定位光标，不受影响）。
+    document.addEventListener('touchstart', function (e) {
+      try {
+        var t = e.target;
+        if (!t || !t.closest || !t.closest('.monaco-editor')) return;
+        var ta = document.querySelector('.monaco-editor .inputarea');
+        if (ta && document.activeElement !== ta) ta.focus();
+      } catch (err) {}
+    }, true);
   }
 
   if (WIN_TYPE === 'detached-stage') {

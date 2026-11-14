@@ -115,6 +115,14 @@ public abstract class NWActivity extends AppCompatActivity {
         webView.setWebChromeClient(new BridgeWebChromeClient(this));
         webView.addJavascriptInterface(new NeoWarpBridge(this, windowType), "NeoWarpAndroid");
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        // 输入法兜底：WebView 必须持有可触摸焦点，软键盘才会随页面内的
+        // 焦点变化弹出（扩展编辑器 monaco 代码区此前点不出键盘的部分根因）
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
+        webView.setOnTouchListener((v, ev) -> {
+            if (!v.hasFocus()) v.requestFocusFromTouch();
+            return false;
+        });
 
         // 视口贴合全面屏（刘海/挖孔区域由 viewport-fit=cover 的页面自行处理）
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);

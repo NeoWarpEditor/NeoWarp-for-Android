@@ -2015,7 +2015,7 @@ public class BridgeHub {
         try {
             return app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName;
         } catch (Exception e) {
-            return "0.0.1";
+            return "0.0.2";
         }
     }
 
