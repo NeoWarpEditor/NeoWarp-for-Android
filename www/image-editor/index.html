@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head><script src="/bridge.js"></script>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>图片编辑器</title>
     <style>
       /* =========================================================================
@@ -11,6 +11,19 @@
          布局：菜单栏 / 工具选项栏 / 左工具栏 / 画布(标尺) / 右侧面板 / 状态栏
          ========================================================================= */
       * { box-sizing: border-box; }
+      /* ===== 触屏基础 =====
+         画布区的手势全部由 JS 接管（绘制 / 双指缩放平移），禁止浏览器把它
+         当成页面滚动或双击缩放；面板区仍允许原生单指滚动。 */
+      .canvas-scroll, .canvas-pad, .canvas-stack, #overlay, #canvas { touch-action: none; }
+      #sv-canvas, #hue-slider { touch-action: none; }
+      .menubar, .toolbar, .optionsbar, .side-panel, .menu-dropdown,
+      .swatch-grid, .layer-list { touch-action: pan-x pan-y; }
+      .tool-btn, .menu-root, .menu-item, .btn-full, .swatch, .menubar-btn,
+      .layer-item { -webkit-tap-highlight-color: transparent; }
+      /* 触屏没有 hover，用 :active 给即时按压反馈 */
+      .tool-btn:active { background: var(--accent); color: #fff; }
+      .menu-root:active, .menu-item:active, .btn-full:active:not(:disabled),
+      .layer-item:active { background: var(--accent-soft); }
       html, body { margin: 0; padding: 0; height: 100%; }
       body {
         font-family: "HarmonyOS Sans SC", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
@@ -2328,8 +2341,8 @@
         body.appendChild(sw);
 
         // 交互
-        svCanvas.addEventListener('mousedown', function (e) { dragSV(e); });
-        hueCanvas.addEventListener('mousedown', function (e) { dragHue(e); });
+        svCanvas.addEventListener('pointerdown', function (e) { e.preventDefault(); dragSV(e); });
+        hueCanvas.addEventListener('pointerdown', function (e) { e.preventDefault(); dragHue(e); });
         hexInput.addEventListener('change', function () { setFgFromHex(hexInput.value); });
         [rInput, gInput, bInput].forEach(function (inp) {
           inp.addEventListener('change', function () { setFgFromRgb(parseInt(rInput.value, 10), parseInt(gInput.value, 10), parseInt(bInput.value, 10)); });
@@ -2347,8 +2360,14 @@
         }
         apply(e);
         function mv (ev) { apply(ev); }
-        function up () { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); }
-        window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+        function up () {
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
+        }
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
       }
       function dragHue (e) {
         var r = hueCanvas.getBoundingClientRect();
@@ -2360,8 +2379,14 @@
         }
         apply(e);
         function mv (ev) { apply(ev); }
-        function up () { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); }
-        window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+        function up () {
+          window.removeEventListener('pointermove', mv);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
+        }
+        window.addEventListener('pointermove', mv);
+        window.addEventListener('pointerup', up);
+        window.addEventListener('pointercancel', up);
       }
       function drawSV () {
         var c = svCanvas.getContext('2d');
@@ -3958,18 +3983,120 @@
         buildOptionsBar();
         documentTitle(L.untitled);
 
-        // 指针事件
-        overlay.addEventListener('mousedown', function (e) {
+        /* ===== 触屏交互层 =====
+           原来只绑 mousedown/mousemove/mouseup：Android WebView 把手指拖动判成
+           页面滚动，touchmove 不合成 mousemove，画笔、选框、取色、缩放全部拖不动。
+           改为 Pointer Events（一套同时覆盖鼠标/触摸/手写笔），配合 CSS
+           touch-action:none 让画布区手势完全由这里接管；另加双指缩放平移、
+           长按右键菜单、pointercancel 收尾。 */
+        var activePts = new Map();   // pointerId -> {x,y}，用于多指追踪
+        var pinch = null;            // 双指手势基准
+        var lpTimer = null, lpOrigin = null;
+        var LONG_MS = 500, TAP_SLOP = 10;
+
+        function pts2 () { return Array.from(activePts.values()).slice(0, 2); }
+        function dist2 (a, b) { return Math.max(1, Math.sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y))); }
+        function mid2 (a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+        function clearLongPress () {
+          if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+          lpOrigin = null;
+        }
+        function dropSession () {
+          // 双指落下/长按/被系统打断时丢弃未提交的单指会话（不提交半截笔迹）
+          if (!session) return;
+          var s = session; session = null;
+          if (s.kind === 'xform') cancelTransform();
+          render();
+        }
+        function beginPinch () {
+          var p = pts2(); if (p.length < 2) return;
+          dropSession(); clearLongPress();
+          var m = mid2(p[0], p[1]);
+          var r = canvas.getBoundingClientRect();
+          pinch = { d0: dist2(p[0], p[1]), z0: view.zoom,
+            p0: { x: (m.x - r.left) / view.zoom, y: (m.y - r.top) / view.zoom } };
+        }
+        function updatePinch () {
+          if (!pinch || !doc) return;
+          var p = pts2(); if (p.length < 2) return;
+          var m = mid2(p[0], p[1]);
+          var z = clamp(pinch.z0 * dist2(p[0], p[1]) / pinch.d0, ZOOM_MIN, ZOOM_MAX);
+          view.zoom = z;
+          render();
+          // 以双指中心为锚：把开始时的文档点 p0 拉回当前中心，
+          // 缩放与平移一次完成；每次按当前 rect 绝对收敛，不累积漂移
+          var r = canvas.getBoundingClientRect();
+          canvasScroll.scrollLeft += (r.left + pinch.p0.x * z) - m.x;
+          canvasScroll.scrollTop += (r.top + pinch.p0.y * z) - m.y;
+          drawRulers();
+        }
+        function trackDown (e) {
+          activePts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (activePts.size >= 2) { beginPinch(); return true; }
+          return false;
+        }
+        function trackMove (e) {
+          if (!activePts.has(e.pointerId)) return false;
+          activePts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pinch && activePts.size >= 2) { updatePinch(); return true; }
+          return false;
+        }
+        function trackUp (e) {
+          activePts.delete(e.pointerId);
+          clearLongPress();
+          if (pinch && activePts.size < 2) { pinch = null; return true; }
+          if (activePts.size >= 2) beginPinch();
+          return false;
+        }
+        function armLongPress (e) {
+          if (e.pointerType !== 'touch') return;
+          clearLongPress();
+          lpOrigin = { x: e.clientX, y: e.clientY };
+          lpTimer = setTimeout(function () {
+            lpTimer = null;
+            if (!lpOrigin) return;
+            var x = lpOrigin.x, y = lpOrigin.y; lpOrigin = null;
+            dropSession();
+            // 触屏没有右键：长按弹出画布上下文菜单
+            onContextMenu({ clientX: x, clientY: y, preventDefault: function () {} });
+          }, LONG_MS);
+        }
+        function cancelLongPressOnMove (e) {
+          if (lpOrigin && Math.sqrt((e.clientX - lpOrigin.x) * (e.clientX - lpOrigin.x)
+              + (e.clientY - lpOrigin.y) * (e.clientY - lpOrigin.y)) > TAP_SLOP) clearLongPress();
+        }
+
+        function onCanvasPointerDown (e) {
+          if (trackDown(e)) return;                    // 第二根手指：交给双指手势
+          if (e.pointerType === 'touch') e.preventDefault(); // 阻止合成鼠标事件重复触发
           if (xform) { var p = screenToDoc(e.clientX, e.clientY); if (startXformDrag(e, p)) { session = { kind: 'xform' }; return; } }
           pointerDown(e);
-        });
-        canvasScroll.addEventListener('mousedown', function (e) {
+          armLongPress(e);
+        }
+        function onCanvasPointerMove (e) {
+          if (trackMove(e)) return;                   // 双指缩放/平移中不绘制
+          cancelLongPressOnMove(e);
+          pointerMove(e);
+        }
+        function onCanvasPointerUp (e) {
+          var wasPinch = trackUp(e);
+          if (!wasPinch) pointerUp(e);
+        }
+        function onCanvasPointerCancel (e) {
+          trackUp(e); dropSession(); render();
+        }
+
+        overlay.addEventListener('pointerdown', onCanvasPointerDown);
+        canvasScroll.addEventListener('pointerdown', function (e) {
+          if (e.target === overlay) return;             // overlay 已统一处理，避免重复入表
+          if (trackDown(e)) return;
           if (e.target === canvasScroll || e.target === canvasPad) {
             if (doc && !spaceDown && tool !== 'hand' && (e.button === 0)) { /* 点空白取消选择 */ deselect(); }
           }
         });
-        window.addEventListener('mousemove', pointerMove);
-        window.addEventListener('mouseup', pointerUp);
+        window.addEventListener('pointermove', onCanvasPointerMove);
+        window.addEventListener('pointerup', onCanvasPointerUp);
+        window.addEventListener('pointercancel', onCanvasPointerCancel);
         overlay.addEventListener('contextmenu', onContextMenu);
         overlay.addEventListener('mouseleave', function () { lastPointer.inside = false; updateBrushCursor(); });
         canvasScroll.addEventListener('wheel', onWheel, { passive: false });
@@ -3977,10 +4104,10 @@
         window.addEventListener('resize', function () { drawRulers(); });
 
         // 菜单关闭
-        document.addEventListener('mousedown', function (e) {
+        document.addEventListener('pointerdown', function (e) {
           if (!menuDropdown.contains(e.target) && !e.target.closest('.menu-root')) closeMenu();
         });
-        modalMask.addEventListener('mousedown', function (e) { if (e.target === modalMask) closeModal(); });
+        modalMask.addEventListener('pointerdown', function (e) { if (e.target === modalMask) closeModal(); });
 
         // 面板折叠
         $('panel-toggle').addEventListener('click', function () { sidePanel.classList.toggle('collapsed'); });
