@@ -619,18 +619,27 @@
           + 'grid-template-rows:34px minmax(0,1fr) !important;'
           + 'grid-template-areas:"info" "list" !important;'
           + 'width:100% !important;min-width:0 !important;overflow:hidden !important}',
-        /* 背景方块：与列表同格、靠左垂直居中，保证和角色卡片同一水平线 */
+        /* 背景方块：与列表同格、靠左垂直居中，保证和角色卡片同一水平线。
+           毛玻璃：wrapper 整块 backdrop-blur，横向滑动的角色卡片从它下方
+           经过时透出模糊影像（wrapper z5 > 列表 z1）。 */
         P + '[class*="target-pane_stage-selector-wrapper_"]{'
           + 'grid-area:list !important;position:relative !important;'
           + 'align-self:center !important;justify-self:start !important;'
           + 'width:72px !important;height:72px !important;min-height:0 !important;'
-          + 'margin-left:2px !important;z-index:5 !important;overflow:visible !important}',
+          + 'margin-left:2px !important;z-index:5 !important;overflow:visible !important;'
+          + '-webkit-backdrop-filter:blur(14px) saturate(1.5) !important;'
+          + 'backdrop-filter:blur(14px) saturate(1.5) !important;'
+          + 'border-radius:12px !important}',
         P + '[class*="stage-selector_stage-selector_"]{'
           + 'width:72px !important;height:72px !important;min-height:0 !important;'
           + 'flex:none !important;display:flex !important;flex-direction:column !important;'
-          + 'box-sizing:border-box !important;border:4px solid #8e2b2b !important;'
-          + 'border-radius:12px !important;background:#8e2b2b !important;'
+          + 'box-sizing:border-box !important;border:4px solid rgba(255,255,255,.16) !important;'
+          + 'border-radius:12px !important;background:rgba(28,28,30,.55) !important;'
           + 'overflow:hidden !important;padding:0 !important;margin:0 !important}',
+        P + '[class*="stage-selector_stage-selector_"]' +
+          '[class*="stage-selector_is-selected_"]{'
+          + 'border-color:#0a84ff !important;background:rgba(10,60,120,.45) !important;'
+          + 'box-shadow:none !important}',
         P + '[class*="stage-selector_header_"],'
           + P + '[class*="stage-selector_count_"],'
           + P + '[class*="stage-selector_add-button_"]{display:none !important}',
@@ -639,12 +648,13 @@
           + 'height:auto !important;max-width:none !important;max-height:none !important;'
           + 'object-fit:contain !important;margin:0 !important;border:0 !important;'
           + 'border-radius:8px 8px 0 0 !important;box-shadow:none !important;'
-          + 'background:#111 !important}',
+          + 'background:rgba(0,0,0,.35) !important}',
         P + '[class*="stage-selector_label_"]{'
           + 'display:block !important;flex:0 0 24px !important;height:24px !important;'
           + 'min-height:24px !important;width:100% !important;margin:0 !important;'
           + 'padding:0 2px !important;box-sizing:border-box !important;'
-          + 'background:#ff4c4c !important;color:#fff !important;font-size:13px !important;'
+          + 'background:rgba(255,255,255,.10) !important;color:rgba(255,255,255,.92) !important;'
+          + 'font-size:13px !important;font-weight:500 !important;'
           + 'line-height:24px !important;text-align:center !important;'
           + 'border-radius:0 0 8px 8px !important;overflow:hidden !important;'
           + 'white-space:nowrap !important}',
@@ -719,14 +729,19 @@
         P + '[class*="sprite-selector-item_sprite-selector-item_"]{'
           + 'height:100% !important;min-height:100% !important;'
           + 'display:flex !important;flex-direction:column !important;'
-          + 'box-sizing:border-box !important;border:4px solid #8e2b2b !important;'
+          + 'box-sizing:border-box !important;border:4px solid rgba(255,255,255,.16) !important;'
           + 'border-radius:12px !important;overflow:visible !important;'
-          + 'background:#8e2b2b !important}',
+          + 'background:#1c1c1e !important}',
+        /* 选中态：iOS 蓝（#0a84ff）描边 + 名字条同色，未选中为中性灰。
+           原生 is-selected 还有 4px 的 var(--looks-transparent) glow，
+           TurboWarp 主题下会渲染成粉红圈，这里清零只留蓝色描边 */
+        P + '[class*="sprite-selector-item_is-selected_"]{'
+          + 'border-color:#0a84ff !important;box-shadow:none !important}',
         /* 缩略图区：flex 吃掉上方全部剩余高度（不再用塌陷的 height:100%） */
         P + '[class*="sprite-selector-item_sprite-image-outer_"]{'
           + 'flex:1 1 auto !important;height:auto !important;min-height:0 !important;'
           + 'width:100% !important;position:relative !important;'
-          + 'background:#111 !important;border-radius:8px 8px 0 0 !important;'
+          + 'background:#101012 !important;border-radius:8px 8px 0 0 !important;'
           + 'overflow:hidden !important}',
         P + '[class*="sprite-selector-item_sprite-image-inner_"]{'
           + 'position:absolute !important;top:0 !important;left:0 !important;'
@@ -735,13 +750,15 @@
         P + '[class*="sprite-selector-item_sprite-image_"]{'
           + 'max-width:36px !important;max-height:36px !important;'
           + 'width:auto !important;height:auto !important}',
-        /* 名字区：下方固定 24px 红底 + 白色字，不再与缩略图叠在一起 */
+        /* 名字区：下方固定 24px 名字条。未选中半透明中性灰，选中随卡片变 iOS 蓝 */
         P + '[class*="sprite-selector-item_sprite-info_"]{'
           + 'flex:0 0 24px !important;height:24px !important;min-height:24px !important;'
           + 'box-sizing:border-box !important;'
           + 'display:flex !important;align-items:center !important;justify-content:center !important;'
-          + 'background:#ff4c4c !important;color:#fff !important;'
+          + 'background:rgba(255,255,255,.10) !important;color:rgba(255,255,255,.92) !important;'
           + 'border-radius:0 0 8px 8px !important;padding:0 3px !important}',
+        P + '[class*="sprite-selector-item_is-selected_"] > [class*="sprite-selector-item_sprite-info_"]{'
+          + 'background:#0a84ff !important;color:#fff !important}',
         P + '[class*="sprite-selector-item_sprite-name_"]{'
           + 'font-size:13px !important;line-height:1 !important;color:#fff !important;'
           + 'text-align:center !important;max-width:100% !important;'
@@ -762,7 +779,7 @@
           + 'width:26px !important;height:26px !important;z-index:3 !important}',
         P + '[class*="delete-button_delete-button-visible_"]{'
           + 'width:26px !important;height:26px !important;'
-          + 'border-radius:50% !important;background:#ff4c4c !important;'
+          + 'border-radius:50% !important;background:#ff453a !important;'
           + 'display:flex !important;align-items:center !important;justify-content:center !important;'
           + 'box-shadow:0 2px 5px rgba(0,0,0,.35) !important}',
         P + '[class*="delete-button_delete-icon_"]{width:15px !important;height:15px !important}',
