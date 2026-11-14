@@ -779,6 +779,8 @@ public class BridgeHub {
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
                 i.setType("image/*");
+                i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
                 int req = nextSaf(p);
                 caller.startIntentForResult(Intent.createChooser(i, "打开图片"), req);
                 return;
@@ -1336,11 +1338,21 @@ public class BridgeHub {
                 }
                 case "image-open": {
                     if (uri == null) { reply(p.cbId, jstr(null)); return; }
+                    persist(uri);
                     byte[] bytes = readAll(uri);
                     String b64 = Base64.encodeToString(bytes, Base64.NO_WRAP);
+                    // 按实际文件类型返回 mime：SAF 选的是 image/*，硬编码 image/png
+                    // 会让 JPG/WebP/GIF 的 data URL 声明类型与内容不符
+                    String mime = null;
+                    try { mime = app.getContentResolver().getType(uri); } catch (Exception ignored) {}
+                    if (mime == null || !mime.startsWith("image/")) mime = "image/png";
+                    String dataUrl = "data:" + mime + ";base64," + b64;
                     JSONObject o = new JSONObject()
                             .put("name", nameOf(uri))
-                            .put("dataURL", "data:image/png;base64," + b64);
+                            .put("mime", mime)
+                            // 前端 dataUrlFromPayload 读 dataUrl；保留 dataURL 兼容旧版
+                            .put("dataUrl", dataUrl)
+                            .put("dataURL", dataUrl);
                     reply(p.cbId, o.toString());
                     return;
                 }

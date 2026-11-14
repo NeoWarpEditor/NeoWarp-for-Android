@@ -3613,27 +3613,31 @@
       // ---------- 18. 打开 / 导出 ----------
       function dataUrlFromPayload (payload) {
         if (!payload) return null;
+        // Android 桥接返回 dataURL（大写 URL），Electron preload 用 dataUrl；两者都要认
         if (payload.dataUrl) return payload.dataUrl;
+        if (payload.dataURL) return payload.dataURL;
         if (payload.data) return 'data:' + (payload.mime || 'image/png') + ';base64,' + payload.data;
         if (payload.base64) return payload.base64;
+        if (typeof payload === 'string' && payload.indexOf('data:image/') === 0) return payload;
         return null;
       }
       function openImage () {
         IPC.openFile().then(function (payload) {
-          if (!payload) return;
+          if (!payload) return; // 用户取消选择
           var url = dataUrlFromPayload(payload);
           if (!url) { toast(L.loadFail); return; }
           var img = new Image();
           img.onload = function () { loadImageAsDocument(img, payload.name); };
           img.onerror = function () { toast(L.loadFail); };
           img.src = url;
-        });
+        }, function () { toast(L.loadFail); });
       }
       function openAsLayer () {
         if (!doc) { openImage(); return; }
         IPC.openFile().then(function (payload) {
-          if (!payload) return;
+          if (!payload) return; // 用户取消选择
           var url = dataUrlFromPayload(payload);
+          if (!url) { toast(L.loadFail); return; }
           var img = new Image();
           img.onload = function () {
             var l = createRasterLayer(payload.name || (IS_ZH ? '图层' : 'Layer'), doc.width, doc.height);
@@ -3644,8 +3648,9 @@
             doc.layers.push(l); activeId = l.id;
             pushHistory(IS_ZH ? '打开为图层' : 'Open as Layer'); syncAll();
           };
+          img.onerror = function () { toast(L.loadFail); };
           img.src = url;
-        });
+        }, function () { toast(L.loadFail); });
       }
       function loadImageAsDocument (img, name) {
         doc = { width: img.naturalWidth, height: img.naturalHeight, layers: [] };
