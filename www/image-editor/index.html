@@ -379,17 +379,86 @@
       .btn-row .btn-full { flex: 1; }
       .hint-text { font-size: 11px; color: var(--text-dim); line-height: 1.7; }
 
-      /* 颜色面板 */
-      .color-top { display: flex; gap: 10px; margin-bottom: 10px; }
-      #sv-canvas { width: 168px; height: 130px; border-radius: 4px; border: 1px solid var(--border-strong); cursor: crosshair; display: block; }
-      #hue-slider { width: 16px; height: 130px; border-radius: 4px; border: 1px solid var(--border-strong); cursor: pointer; display: block; }
-      .color-fields { display: flex; flex-direction: column; gap: 5px; }
-      .color-fields .row { margin: 0; }
-      .color-fields .row > label { width: 22px; }
-      .color-fields .field { height: 22px; font-size: 11.5px; }
-      .swatch-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 3px; margin-top: 10px; }
-      .swatch { aspect-ratio: 1; border-radius: 3px; border: 1px solid rgba(128,128,128,0.35); cursor: pointer; }
-      .swatch:hover { outline: 2px solid var(--accent); outline-offset: -1px; }
+      /* 颜色面板 —— 分组卡片式布局，控件统一高度与圆角 */
+      [data-sec="color"] .panel-body { padding: 12px 14px 16px; }
+      .color-panel { display: flex; flex-direction: column; gap: 10px; }
+      .color-group-label {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 10.5px; font-weight: 700; letter-spacing: 0.9px;
+        text-transform: uppercase; color: var(--text-dim); margin-bottom: -2px;
+      }
+      .color-group-label .cg-count {
+        margin-left: auto; font-size: 10.5px; font-weight: 500;
+        letter-spacing: 0; text-transform: none; opacity: 0.75;
+      }
+      .color-top { display: flex; gap: 8px; height: 132px; }
+      #sv-canvas {
+        flex: 1 1 auto; min-width: 0; height: 132px;
+        border-radius: 10px; border: 1px solid var(--border-strong);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+        cursor: crosshair; display: block;
+      }
+      #hue-slider {
+        flex: 0 0 26px; width: 26px; height: 132px;
+        border-radius: 8px; border: 1px solid var(--border-strong);
+        box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06);
+        cursor: pointer; display: block;
+      }
+      .color-current {
+        display: flex; align-items: center; gap: 9px;
+        height: 38px; padding: 0 11px;
+        background: var(--bg-2); border: 1px solid var(--border); border-radius: 9px;
+      }
+      .color-current .cc-dot {
+        width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+        background: #000000; border: 1px solid rgba(128,128,128,0.45);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.18);
+      }
+      .color-current .cc-label { font-size: 11.5px; color: var(--text-dim); }
+      .color-current .cc-hex {
+        margin-left: auto; font-size: 13px; font-weight: 600; letter-spacing: 0.4px;
+        font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--text);
+      }
+      .color-fields { display: flex; flex-direction: column; gap: 8px; }
+      .hex-row, .rgb-cell {
+        display: flex; align-items: center; height: 38px;
+        background: var(--field); border: 1px solid var(--border-strong); border-radius: 9px;
+      }
+      .hex-row { padding: 0 11px; gap: 10px; }
+      .hex-tag, .rgb-tag {
+        font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px;
+        color: var(--text-dim); flex-shrink: 0;
+      }
+      .hex-row .field, .rgb-cell .field {
+        flex: 1; min-width: 0; width: 100%; height: 100%; padding: 0;
+        background: transparent; border: none; outline: none;
+        font-variant-numeric: tabular-nums;
+        font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        color: var(--text);
+      }
+      .hex-row .field { font-size: 14px; font-weight: 600; letter-spacing: 0.6px; }
+      .rgb-row { display: flex; gap: 8px; }
+      .rgb-cell { flex: 1; min-width: 0; padding: 0 9px; gap: 7px; }
+      .rgb-cell .field { font-size: 13.5px; text-align: right; }
+      .rgb-cell .field::-webkit-outer-spin-button,
+      .rgb-cell .field::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+      .hex-row:focus-within, .rgb-cell:focus-within { border-color: var(--accent); }
+      .swatch-scroll {
+        max-height: 134px; overflow-y: auto; overflow-x: hidden;
+        padding: 2px; border-radius: 10px; -webkit-overflow-scrolling: touch;
+      }
+      .swatch-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(34px, 1fr)); gap: 6px;
+      }
+      .swatch {
+        aspect-ratio: 1; border-radius: 8px;
+        border: 1px solid rgba(128,128,128,0.4);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
+        cursor: pointer; transition: transform 0.12s ease;
+      }
+      .swatch:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .swatch:active { transform: scale(0.9); }
 
       /* 图层面板 */
       .layers-top { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
@@ -2308,27 +2377,62 @@
 
       // —— 颜色面板 ——
       var svCanvas, hueCanvas, hexInput, rInput, gInput, bInput, colorPreviewFg, colorPreviewBg;
+      var ccDotEl, ccHexEl;
       function buildColorPanel (body) {
+        var wrap = document.createElement('div');
+        wrap.className = 'color-panel';
+
+        function groupLabel (text, count) {
+          var l = document.createElement('div');
+          l.className = 'color-group-label';
+          l.innerHTML = '<span>' + text + '</span>' +
+            (count ? '<span class="cg-count">' + count + '</span>' : '');
+          wrap.appendChild(l);
+        }
+
+        groupLabel(IS_ZH ? '取色器' : 'PICKER');
+
+        // 取色区：SV 占满剩余宽度，色相条固定宽度，两者等高
         var top = document.createElement('div');
         top.className = 'color-top';
-        svCanvas = makeCanvas(168, 130);
+        svCanvas = makeCanvas(256, 152);
         svCanvas.id = 'sv-canvas';
-        hueCanvas = makeCanvas(16, 130);
+        hueCanvas = makeCanvas(28, 152);
         hueCanvas.id = 'hue-slider';
         top.appendChild(svCanvas); top.appendChild(hueCanvas);
-        body.appendChild(top);
+        wrap.appendChild(top);
+
+        var current = document.createElement('div');
+        current.className = 'color-current';
+        current.innerHTML =
+          '<span class="cc-dot" id="cc-dot"></span>' +
+          '<span class="cc-label">' + (IS_ZH ? '当前颜色' : 'Current') + '</span>' +
+          '<span class="cc-hex" id="cc-hex">#000000</span>';
+        wrap.appendChild(current);
+        ccDotEl = current.querySelector('#cc-dot');
+        ccHexEl = current.querySelector('#cc-hex');
+
+        groupLabel(IS_ZH ? '数值' : 'VALUES');
 
         var fields = document.createElement('div');
         fields.className = 'color-fields';
         fields.innerHTML =
-          '<div class="row"><label>HEX</label><input class="field" id="hex-input" value="#000000"></div>' +
-          '<div class="row"><label>R</label><input class="field num" id="r-input" type="number" min="0" max="255"><label>G</label><input class="field num" id="g-input" type="number" min="0" max="255"><label>B</label><input class="field num" id="b-input" type="number" min="0" max="255"></div>';
-        body.appendChild(fields);
+          '<div class="hex-row"><span class="hex-tag">HEX</span><input class="field" id="hex-input" value="#000000" spellcheck="false"></div>' +
+          '<div class="rgb-row">' +
+            '<div class="rgb-cell"><span class="rgb-tag">R</span><input class="field num" id="r-input" type="number" min="0" max="255"></div>' +
+            '<div class="rgb-cell"><span class="rgb-tag">G</span><input class="field num" id="g-input" type="number" min="0" max="255"></div>' +
+            '<div class="rgb-cell"><span class="rgb-tag">B</span><input class="field num" id="b-input" type="number" min="0" max="255"></div>' +
+          '</div>';
+        wrap.appendChild(fields);
         hexInput = fields.querySelector('#hex-input');
         rInput = fields.querySelector('#r-input');
         gInput = fields.querySelector('#g-input');
         bInput = fields.querySelector('#b-input');
 
+        groupLabel(IS_ZH ? '预设色板' : 'SWATCHES', SWATCHES.length);
+
+        var scroll = document.createElement('div');
+        scroll.className = 'swatch-scroll';
         var sw = document.createElement('div');
         sw.className = 'swatch-grid';
         SWATCHES.forEach(function (c) {
@@ -2338,9 +2442,12 @@
           b.addEventListener('contextmenu', function (e) { e.preventDefault(); bgColor = c; syncColorPanel(); refreshColorSwatches(); });
           sw.appendChild(b);
         });
-        body.appendChild(sw);
+        scroll.appendChild(sw);
+        wrap.appendChild(scroll);
 
-        // 交互
+        body.appendChild(wrap);
+
+        // 交互（保持原有逻辑不变）
         svCanvas.addEventListener('pointerdown', function (e) { e.preventDefault(); dragSV(e); });
         hueCanvas.addEventListener('pointerdown', function (e) { e.preventDefault(); dragHue(e); });
         hexInput.addEventListener('change', function () { setFgFromHex(hexInput.value); });
@@ -2424,6 +2531,9 @@
         hexInput.value = fgColor;
         var rgb = hexToRgb(fgColor);
         rInput.value = rgb.r; gInput.value = rgb.g; bInput.value = rgb.b;
+        // 所有改色路径（取色 / HEX / RGB / 色板）都会走到这里，预览在此同步
+        if (ccDotEl) ccDotEl.style.background = fgColor;
+        if (ccHexEl) ccHexEl.textContent = String(fgColor).toUpperCase();
       }
       function setFgFromHex (v) {
         if (!/^#?[0-9a-fA-F]{6}$/.test(String(v).trim()) && !/^#?[0-9a-fA-F]{3}$/.test(String(v).trim())) return;

@@ -798,29 +798,9 @@
         background: transparent;
       }
 
-      /* Narrow window: collapse sidebar to icon rail */
+      /* 窄屏：设置页采用单列 iOS 列表（见文末「单页设置」规则），不再折叠成图标栏 */
       @media (max-width: 600px) {
-        .sidebar {
-          width: 64px;
-          margin: 10px 0 10px 10px;
-          padding: 14px 8px 8px 8px;
-        }
-        .sidebar-header {
-          justify-content: center;
-          padding-left: 0;
-          padding-right: 0;
-          padding-bottom: 12px;
-        }
-        .sidebar-header-text, .nav-label, .sidebar-footer {
-          display: none;
-        }
-        .nav-item {
-          justify-content: center;
-          padding: 8px 0;
-        }
-        .content {
-          padding: 20px 18px 36px 16px;
-        }
+        .sidebar-header { padding-top: 16px; }
       }
 
       /* Misc */
@@ -1330,6 +1310,102 @@
       @media (prefers-reduced-motion: reduce) {
         .ai-spin { animation: none; }
       }
+
+      /* ===== 单页设置（手机「设置」式导航）=====
+         去掉左右分栏：首页是一列分组圆角列表，点任一项进入二级页，
+         二级页顶部带返回栏。由 body.nw-detail 切换两种状态。 */
+      .layout { display: block; height: 100vh; height: 100dvh; }
+
+      /* —— 首页列表 —— */
+      .sidebar {
+        width: auto; height: 100%; margin: 0; padding: 0;
+        border: none; border-radius: 0; box-shadow: none;
+        background: transparent;
+        -webkit-backdrop-filter: none; backdrop-filter: none;
+        overflow-y: auto; overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+      }
+      .sidebar-header {
+        flex-direction: column; align-items: flex-start; gap: 2px;
+        padding: 20px 20px 18px;
+      }
+      .app-icon { display: none; }
+      .sidebar-title {
+        font-size: 32px; font-weight: 700; letter-spacing: -0.9px;
+        line-height: 1.15; white-space: normal;
+      }
+      .sidebar-subtitle { font-size: 13px; letter-spacing: 0; color: var(--text-secondary); }
+      .nav {
+        display: block; padding: 0; margin: 0 16px; gap: 0;
+        background: var(--card-bg);
+        border: 0.5px solid var(--card-border);
+        border-radius: 14px; box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .nav + .nav { margin-top: 20px; }
+      .nav-item {
+        position: relative; height: 56px; padding: 0 14px; gap: 12px;
+        border-radius: 0; background: var(--card-bg);
+        font-size: 16px; font-weight: 400;
+      }
+      .nav-item + .nav-item::before {
+        content: ''; position: absolute; left: 56px; right: 0; top: 0;
+        height: 0.5px; background: var(--separator);
+      }
+      .nav-item::after {
+        content: ''; position: absolute; right: 17px; top: 50%;
+        width: 8px; height: 8px; margin-top: -5px;
+        border-right: 2px solid var(--text-tertiary);
+        border-top: 2px solid var(--text-tertiary);
+        transform: rotate(45deg); opacity: 0.75;
+      }
+      .nav-item:hover { background: var(--hover-bg); }
+      .nav-item:active { background: var(--active-bg); }
+      .nav-item.selected { background: var(--card-bg); color: var(--text); font-weight: 400; }
+      .nav-item .nav-icon { width: 30px; height: 30px; border-radius: 7px; }
+      .nav-item .nav-icon svg { width: 17px; height: 17px; }
+      .nav-label { flex: 1; font-size: 16px; }
+      .sidebar-footer {
+        margin-top: 22px; padding: 4px 20px 32px; font-size: 12px;
+        color: var(--text-tertiary); text-align: center;
+      }
+
+      /* —— 二级页 —— */
+      .content {
+        height: 100%; padding: 0 16px 44px; overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      .page { max-width: none; }
+      .page-title { display: none; }
+      .detail-nav { display: none; }
+      body.nw-detail .detail-nav {
+        display: flex; align-items: center; position: sticky; top: 0; z-index: 30;
+        height: 52px; margin: 0 -16px 14px; padding: 0 8px;
+        background: var(--sidebar-bg);
+        -webkit-backdrop-filter: blur(24px) saturate(160%);
+        backdrop-filter: blur(24px) saturate(160%);
+        border-bottom: 0.5px solid var(--card-border);
+      }
+      .detail-back {
+        display: flex; align-items: center; gap: 2px; height: 44px;
+        padding: 0 8px 0 4px; background: transparent;
+        color: var(--accent); font-size: 16px; font-weight: 400;
+        border: none; outline: none;
+        border-radius: 10px; cursor: pointer; flex-shrink: 0;
+      }
+      .detail-back:active { opacity: 0.6; }
+      .detail-back svg { width: 22px; height: 22px; }
+      .detail-title {
+        position: absolute; left: 50%; transform: translateX(-50%);
+        font-size: 16px; font-weight: 600; letter-spacing: -0.2px;
+        color: var(--text); white-space: nowrap; max-width: 46%;
+        overflow: hidden; text-overflow: ellipsis;
+      }
+      .detail-spacer { flex: 1; }
+
+      /* 状态互斥 */
+      body.nw-detail .sidebar { display: none; }
+      body:not(.nw-detail) .content { display: none; }
     </style>
   </head>
   <body>
@@ -1386,6 +1462,8 @@
             </span>
             <span class="nav-label"></span>
           </button>
+        </nav>
+        <nav class="nav">
           <button class="nav-item" data-page="privacy">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -1423,6 +1501,15 @@
 
       <!-- Content -->
       <main class="content" id="content">
+        <!-- 二级页返回栏 -->
+        <div class="detail-nav" id="detail-nav">
+          <button class="detail-back" id="detail-back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <span class="detail-back-label"></span>
+          </button>
+          <span class="detail-title" id="detail-title"></span>
+          <span class="detail-spacer"></span>
+        </div>
         <!-- Updates -->
         <section class="page active" data-page="updates">
           <h1 class="page-title"></h1>
@@ -1892,18 +1979,30 @@
       document.querySelector('.sidebar-title').textContent = strings['desktop-settings.title'];
       document.querySelector('.sidebar-footer').textContent = `NeoWarp ${version}`;
 
-      // ===== Section switching =====
+      // ===== Section switching（单页设置：列表 → 二级页 → 返回）=====
       const content = document.getElementById('content');
       const navItems = Array.from(document.querySelectorAll('.nav-item'));
       const pages = Array.from(document.querySelectorAll('.page'));
+      const detailTitle = document.getElementById('detail-title');
+      const detailBack = document.getElementById('detail-back');
+      document.querySelector('.detail-back-label').textContent =
+        strings['desktop-settings.title'] || '设置';
+
+      function enterDetail (item) {
+        const id = item.dataset.page;
+        navItems.forEach((other) => other.classList.toggle('selected', other === item));
+        pages.forEach((page) => page.classList.toggle('active', page.dataset.page === id));
+        detailTitle.textContent = item.querySelector('.nav-label').textContent;
+        document.body.classList.add('nw-detail');
+        content.scrollTop = 0;
+      }
       navItems.forEach((item) => {
-        item.addEventListener('click', () => {
-          if (item.classList.contains('selected')) return;
-          navItems.forEach((other) => other.classList.toggle('selected', other === item));
-          const id = item.dataset.page;
-          pages.forEach((page) => page.classList.toggle('active', page.dataset.page === id));
-          content.scrollTop = 0;
-        });
+        item.addEventListener('click', () => enterDetail(item));
+      });
+      detailBack.addEventListener('click', () => {
+        document.body.classList.remove('nw-detail');
+        navItems.forEach((i) => i.classList.remove('selected'));
+        pages.forEach((p) => p.classList.remove('active'));
       });
 
       // ===== Check for updates =====
@@ -2424,9 +2523,20 @@
           setLanguageSelection(segment.dataset.value);
           // 记住当前页，便于切换语言后重载回到此页
           try { sessionStorage.setItem('ds-restore-page', 'language'); } catch (e) {}
-          DesktopSettingsPreload.setLocale(segment.dataset.value).then(() => {
-            location.reload();
-          });
+          let done = false;
+          const reload = () => {
+            if (done) return;
+            done = true;
+            try { location.reload(); } catch (e) {}
+          };
+          try {
+            // 宿主会同步语言到所有窗口（含编辑器），回调返回后再刷新本页
+            const result = DesktopSettingsPreload.setLocale(segment.dataset.value);
+            if (result && typeof result.then === 'function') result.then(reload, reload);
+            else reload();
+          } catch (e) { reload(); }
+          // 兜底：极少数情况下宿主回调丢失，也必须刷新让新语言生效
+          setTimeout(reload, 1200);
         });
       }
 

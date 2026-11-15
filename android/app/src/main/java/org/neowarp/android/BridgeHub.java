@@ -332,6 +332,8 @@ public class BridgeHub {
                     if (args != null) settings().edit().putString("locale", args.optString("locale", "en")).apply();
                     return jstr(null);
                 }
+                // 返回未经归一化的原始语言代码，供编辑器写入 tw:language
+                case "getGuiLocale": return jstr(settings().getString("locale", ""));
                 case "getCodeAreaBackgroundImage": return jstr(settingsOpt("codeAreaBackgroundImage"));
                 case "getStageAreaBackgroundImage": return jstr(settingsOpt("stageAreaBackgroundImage"));
                 case "getTopBarDeviceStats": return jstr(false); // Android 顶部不显示 CPU/内存
@@ -1169,7 +1171,10 @@ public class BridgeHub {
             /* --- 语言/引导 --- */
             case "applyLocale": {
                 String loc = args.optString("locale", "");
-                if (!loc.isEmpty()) settings().edit().putString("locale", loc).apply();
+                if (!loc.isEmpty()) {
+                    settings().edit().putString("locale", loc).apply();
+                    applyLocaleEverywhere(loc);
+                }
                 reply(cbId, ok());
                 return;
             }
@@ -1746,6 +1751,18 @@ public class BridgeHub {
         if (w != null) w.evaluateJs("__nw.evt(" + jq(type) + "," + jq(event) + "," + jqRaw(data) + ")");
     }
 
+    /** 语言变更后同步到已打开的窗口：
+     *  编辑器窗口收到事件后写 tw:language + dispatch redux，即时切换且不
+     *  reload（reload 会丢失用户正在编辑的项目）；首页刷新后重新读取
+     *  effectiveLocale()。桌面设置窗口自己会 reload，这里不广播，避免双重刷新。 */
+    private void applyLocaleEverywhere(String rawLoc) {
+        String guiLoc = rawLoc.trim().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+        if (guiLoc.isEmpty()) guiLoc = "en";
+        String data = "{\"locale\":" + jq(guiLoc) + "}";
+        notifyEditorEvent("locale-changed", data);
+        notifyWindows("home", "locale-changed", data);
+    }
+
     private void broadcastSetting(String event, String jsonRaw) {
         for (String t : new String[]{"editor", "desktop-settings", "ai-assistant", "solo", "extension-editor"}) {
             NWActivity w = findFirstByType(t);
@@ -2027,7 +2044,7 @@ public class BridgeHub {
         try {
             return app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName;
         } catch (Exception e) {
-            return "0.0.2";
+            return "0.0.3";
         }
     }
 

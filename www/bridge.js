@@ -322,13 +322,16 @@
           + 'overflow-y:auto !important;-webkit-overflow-scrolling:touch;'
           + 'border-left:none !important;border-top:1px solid var(--border)}'
           + '.canvas-wrap{min-height:0 !important}'
-          /* 颜色面板紧凑化：SV/色相条压扁、色板限高内部滚动。
-             取色按 getBoundingClientRect 归一化，CSS 缩放不影响精度 */
-          + '#sv-canvas{width:auto !important;height:104px !important;max-width:100% !important}'
-          + '#hue-slider{width:auto !important;height:104px !important}'
-          + '.swatch-grid{grid-template-columns:repeat(auto-fill,minmax(32px,1fr)) !important;'
-          + 'max-height:116px !important;overflow-y:auto !important;-webkit-overflow-scrolling:touch}'
-          + '.swatch{min-width:32px !important;min-height:32px !important}'
+          /* 颜色面板竖屏紧凑化：取色区整体压扁但保持 SV/色相条比例，
+             色板限高内部滚动。取色按 getBoundingClientRect 归一化，CSS 缩放不影响精度 */
+          + '.color-top{height:104px !important}'
+          + '#sv-canvas{height:104px !important;flex:1 1 auto !important;min-width:0 !important}'
+          + '#hue-slider{height:104px !important;width:24px !important;flex:0 0 24px !important}'
+          + '.swatch-grid{grid-template-columns:repeat(auto-fill,minmax(36px,1fr)) !important;'
+          + 'gap:6px !important}'
+          + '.swatch-scroll{max-height:112px !important;overflow-y:auto !important;'
+          + '-webkit-overflow-scrolling:touch}'
+          + '.swatch{min-width:36px !important;min-height:36px !important}'
           /* 触屏触控目标：Apple HIG 44pt 起，原来 22~26px 的按钮/滑块几乎点不中 */
           + '.menubar{height:38px !important}'
           + '.menu-root{height:34px !important;min-width:44px !important;'
@@ -349,8 +352,8 @@
           + '.seg button{height:32px !important;min-width:40px !important;padding:0 12px !important;'
           + 'font-size:12.5px !important}'
           + '.mini-btn{min-height:32px !important;min-width:32px !important}'
-          + '.color-fields .field{height:30px !important;font-size:13px !important}'
-          + '.color-fields .row>label{line-height:30px !important}'
+          + '.hex-row,.rgb-cell{height:40px !important}'
+          + '.hex-row .field,.rgb-cell .field{font-size:14px !important}'
           + '.btn-full{height:34px !important;min-height:34px !important;font-size:13px !important}'
           + '.layer-item{min-height:44px !important;gap:9px !important}'
           + '.layers-top select,.layers-top .op input[type="number"]{min-height:32px !important}'
@@ -576,6 +579,32 @@
           /* 原生只有下方 8px 圆角（菜单挂在工具栏下沿）；改到工具栏上方后需四角圆角 */
           + 'border-radius:12px !important}',
         P + '[class*="menu-bar_menu-bar-menu_"], ' + P + '[class*="menu-bar_menu-bar-menu_"] *{font-size:13px !important}',
+        /* 设置菜单的三级菜单（Language / 积木颜色 / 主题色）：原生是
+           position:absolute;left:100% 且只靠 :hover 展开 —— 手机没有 hover
+           所以「点不开」，向右展开又会跑出一屏。竖屏改成「一级菜单外的独立
+           浮层」：fixed 贴屏幕右侧、底部与一级菜单对齐，一级菜单保持完整不
+           被撑开，孙级菜单不再压在子级菜单项上（见 bindSubmenuToggle）。 */
+        P + '[class*="menu_submenu_"]{'
+          + 'position:fixed !important;left:auto !important;right:8px !important;'
+          + 'top:auto !important;bottom:calc(var(--nw-menu-h) + 4px) !important;'
+          + 'width:min(170px, 45vw) !important;min-width:0 !important;max-width:none !important;'
+          + 'max-height:min(52vh, 420px) !important;overflow-y:auto !important;'
+          + 'overflow-x:hidden !important;margin:0 !important;z-index:150 !important;'
+          + 'border:1px solid rgba(128,128,128,.28) !important;border-radius:12px !important;'
+          + 'box-shadow:0 10px 30px rgba(0,0,0,.38) !important;'
+          + '-webkit-overflow-scrolling:touch}',
+        P + '[class*="menu_submenu_"] > [class*="menu_menu_"]{'
+          + 'position:static !important;width:100% !important;max-width:100% !important;'
+          + 'min-width:0 !important;max-height:none !important;overflow:visible !important}',
+        P + '[class*="menu_submenu_"] [class*="menu_menu-item_"]{'
+          + 'width:100% !important;min-width:0 !important;max-width:100% !important;'
+          + 'box-sizing:border-box !important}',
+        /* 完全由 data-nw-expanded 控制，禁掉触屏残留的 :hover 展开：
+           否则「再点一次收起」会被 hover 抵消，表现为菜单忽隐忽现 */
+        P + '[class*="menu_menu-item_"]:not([data-nw-expanded="1"]) > [class*="menu_submenu_"]{'
+          + 'display:none !important}',
+        P + '[data-nw-expanded="1"] > [class*="menu_submenu_"]{display:block !important}',
+        P + '[data-nw-expanded="1"]{background:rgba(128,128,128,.18) !important}',
         P + '[class*="menu-bar_collapsible-label_"],'
           + P + '[class*="menu-bar_tutorials-label_"],'
           + P + '[class*="menu-bar_divider_"],'
@@ -1096,6 +1125,91 @@
         (document.head || document.documentElement).appendChild(st);
       }
 
+      /* 手机没有 hover，设置菜单的二级菜单靠 :hover 展开 → 触屏点不开。
+         在捕获阶段拦截「自身带子菜单」的菜单项点击，切换自定义
+         data-nw-expanded（React 不管理这个属性，重渲染不会清掉）。
+
+         ★ 关键：手机 tap 的事件顺序是 touchend → 浏览器合成 click。一旦在
+           touchend / click 捕获阶段把浮层设成 display:none，随后合成 click
+           的命中测试就会落到浮层下方的元素（实测落到积木区的 <rect>），
+           React 的 onClick 收不到 —— 表现为「语言 / 积木颜色 / 主题色点了
+           没反应」。所以捕获阶段只负责展开，收起统一放到 click 冒泡阶段
+           （晚于 React 的 onClick），期间绝不隐藏浮层。 */
+      function bindSubmenuToggle() {
+        if (bindSubmenuToggle.done) return;
+        bindSubmenuToggle.done = true;
+        var startX = 0, startY = 0, tracking = false, lastItem = null, lastTime = 0;
+        var pendingClear = 0;
+        function clearAllExpanded() {
+          if (pendingClear) { clearTimeout(pendingClear); pendingClear = 0; }
+          var all = document.querySelectorAll('[data-nw-expanded="1"]');
+          for (var k = 0; k < all.length; k++) all[k].removeAttribute('data-nw-expanded');
+        }
+        function hasSubmenu(item) {
+          for (var i = 0; i < item.children.length; i++) {
+            if (String(item.children[i].className || '').indexOf('menu_submenu_') >= 0) return true;
+          }
+          return false;
+        }
+        function itemOf(target) {
+          if (!target || !target.closest) return null;
+          var inMenu = target.closest('[class*="menu_menu_"]');
+          return inMenu ? target.closest('[class*="menu_menu-item_"]') : null;
+        }
+        function toggleFrom(target) {
+          if (!active() || !target || !target.closest) return;
+          var item = itemOf(target);
+          // 具体选项 / 点菜单外：捕获阶段一律不动浮层，交给冒泡阶段收起
+          if (!item || !hasSubmenu(item)) return;
+          var now = Date.now();
+          // touchend 后浏览器还会补发一次 click，同一项 350ms 内只算一次，
+          // 否则「展开」会被紧接着的 click 又收回去
+          if (item === lastItem && now - lastTime < 350) return;
+          lastItem = item; lastTime = now;
+          var menu = item.closest('[class*="menu_menu_"]');
+          if (menu) {
+            var opened = menu.querySelectorAll('[data-nw-expanded="1"]');
+            for (var j = 0; j < opened.length; j++) {
+              if (opened[j] !== item) opened[j].removeAttribute('data-nw-expanded');
+            }
+          }
+          if (item.getAttribute('data-nw-expanded') === '1') item.removeAttribute('data-nw-expanded');
+          else item.setAttribute('data-nw-expanded', '1');
+        }
+        // 冒泡阶段：React 的 onClick 已经跑完，此时收起浮层才安全
+        document.addEventListener('click', function (e) {
+          if (!active()) return;
+          var item = e.target && e.target.closest ? e.target.closest('[class*="menu_menu-item_"]') : null;
+          if (item && hasSubmenu(item)) {
+            // 刚展开的浮层不能收；同时取消 touchend 的兜底定时器
+            if (pendingClear) { clearTimeout(pendingClear); pendingClear = 0; }
+            return;
+          }
+          clearAllExpanded();
+        }, false);
+        // Android WebView 的 tap 不一定合成 click，touchend 也要走一遍；
+        // 滑动超过 12px 视为滚动不展开
+        document.addEventListener('touchstart', function (e) {
+          if (!e.touches || !e.touches.length) return;
+          startX = e.touches[0].clientX; startY = e.touches[0].clientY; tracking = true;
+        }, true);
+        document.addEventListener('touchend', function (e) {
+          if (!tracking) return;
+          tracking = false;
+          var t = e.changedTouches && e.changedTouches[0];
+          if (t && (Math.abs(t.clientX - startX) > 12 || Math.abs(t.clientY - startY) > 12)) return;
+          var item = itemOf(e.target);
+          toggleFrom(e.target);
+          // 兜底：个别 WebView 不合成 click，点具体项或菜单外时延后收起，
+          // 避免浮层一直卡在屏幕上；展开浮层时不设兜底，让用户有时间选
+          if (!item || !hasSubmenu(item)) {
+            if (pendingClear) clearTimeout(pendingClear);
+            pendingClear = setTimeout(function () { pendingClear = 0; clearAllExpanded(); }, 500);
+          }
+        }, true);
+        document.addEventListener('click', function (e) { toggleFrom(e.target); }, true);
+      }
+
       /* ---------------- 舞台按钮（切换全屏舞台，复用 GUI 原生 action） ---------------- */
       var stageBtn = null;
       function toggleFullStage() {
@@ -1345,8 +1459,17 @@
          算拖向画布，故 isDragTowardWorkspace 改判 90° ± range。
          切回 horizontal / 横屏时把方法逐个还原，零残留。 */
       function readLayout() {
+        // 本次会话内以 sessionStorage 为准：页面 reload 后同步桥可能尚未就绪
+        // 或读到默认横向，会表现为「设置是纵向、画面却是横向」。Java 只在
+        // 会话首次提供初值；桌面设置切换时由 editor-layout-changed 事件改写。
         var v = null;
-        try { v = sync('getEditorLayout'); } catch (e) {}
+        try { v = sessionStorage.getItem('nwEditorLayout'); } catch (e) {}
+        if (v !== 'vertical' && v !== 'horizontal') {
+          try { v = sync('getEditorLayout'); } catch (e) {}
+          if (v === 'vertical' || v === 'horizontal') {
+            try { sessionStorage.setItem('nwEditorLayout', v); } catch (e) {}
+          }
+        }
         return v === 'vertical' ? 'vertical' : 'horizontal';
       }
       var curLayout = readLayout();
@@ -1399,6 +1522,9 @@
             m.toolboxHeight = topH;
             return m;
           };
+          // 标记补丁存活：React 重建 workspace / 切语言触发 Blockly 重置时，
+          // 这个标记会消失，保活定时器据此重新 installBlockly()
+          ws.getMetrics.__nwVertical = true;
           flyout.position = function () {
             if (!this.isVisible()) return;
             this.width_ = this.getWidth();
@@ -1434,6 +1560,7 @@
       on('editor', 'editor-layout-changed', function (v) {
         layoutFromEvent = true;
         curLayout = v === 'vertical' ? 'vertical' : 'horizontal';
+        try { sessionStorage.setItem('nwEditorLayout', curLayout); } catch (e) {}
         applyEditorLayout();
         if (active()) { tidyMenuBar(); ensureStageButton(); ensureAddButtons(); syncTabClass(); layoutFindBar(); }
       });
@@ -1480,7 +1607,13 @@
         if (!SB) return false;
         var ws = null;
         try { ws = SB.getMainWorkspace ? SB.getMainWorkspace() : SB.mainWorkspace; } catch (e) {}
-        if (!ws || !ws.getMetrics) return false;
+        if (!ws) return false;
+        // 切语言/主题可能让 Blockly 重置甚至删掉实例上的 getMetrics；
+        // 用首次缓存的原生实现补回，否则下方守卫会把重挂补丁直接挡掉
+        if (typeof ws.getMetrics !== 'function' && layOrig && typeof layOrig.getMetrics === 'function') {
+          try { ws.getMetrics = layOrig.getMetrics; } catch (e) {}
+        }
+        if (typeof ws.getMetrics !== 'function') return false;
         if (patchedWs !== ws) {
           patchedWs = ws;
           // Blockly 就绪时再取一次：兜底 bridge.js 顶层 sync 过早读不到 Java 注入对象，
@@ -1490,6 +1623,17 @@
         }
         applyEditorLayout();   // 按当前排列方式应用/还原坐标分区（内含 reflow）
         return true;
+      }
+      /* 纵向排列的坐标分区补丁是否仍挂在「当前」workspace 上。
+         切语言 / 切主题会让 React 重建 Blocks 或让 Blockly 重置 getMetrics，
+         补丁一旦丢失画面就会退回横向排布，但 <html> 上的 class 仍在，
+         所以必须单独检测（只读标记，无副作用）。 */
+      function patchAlive() {
+        var SB = window.ScratchBlocks;
+        if (!SB) return false;
+        var ws = null;
+        try { ws = SB.getMainWorkspace ? SB.getMainWorkspace() : SB.mainWorkspace; } catch (e) {}
+        return !!(ws && ws === patchedWs && ws.getMetrics && ws.getMetrics.__nwVertical === true);
       }
 
       /* ---------------- 状态机 ---------------- */
@@ -1562,7 +1706,54 @@
       })();
 
       injectCss();
+      bindSubmenuToggle();
       refresh();
+
+      /* ---------------- 布局状态自愈 ----------------
+         切语言 / 切主题 / React 重挂载 / 页面 reload 之后，<html> 上的
+         nw-portrait、nw-layout-vertical 或注入的 #nw-portrait-css 可能被
+         清掉，表现为「设置里仍是纵向排列，画面却退回横向」。这里用
+         MutationObserver 即时补回，配合保活定时器与 storage / pageshow
+         事件兜底；只在状态确实缺失时才重排，避免死循环与无谓 reflow。 */
+      function guardLayout() {
+        var root = document.documentElement;
+        var wantOn = portrait();
+        var needFix = false;
+        if (root.classList.contains(CLS) !== wantOn) {
+          if (wantOn) root.classList.add(CLS); else root.classList.remove(CLS);
+          needFix = true;
+        }
+        if (wantOn) {
+          var wantV = curLayout === 'vertical';
+          var hasV = root.classList.contains('nw-layout-vertical');
+          var hasH = root.classList.contains('nw-layout-horizontal');
+          if (hasV !== wantV || hasH === wantV) needFix = true;
+        }
+        if (!document.getElementById('nw-portrait-css')) { injectCss(); needFix = true; }
+        if (!needFix) return;
+        syncLayoutClass();
+        if (active()) {
+          installBlockly();   // 重新取当前 workspace 并重挂坐标分区补丁
+          tidyMenuBar(); ensureStageButton(); ensureAddButtons();
+          syncTabClass(); layoutFindBar();
+        }
+      }
+      if (window.MutationObserver) {
+        try {
+          new MutationObserver(function () { guardLayout(); })
+            .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+          new MutationObserver(function () {
+            if (!document.getElementById('nw-portrait-css')) guardLayout();
+          }).observe(document.head || document.documentElement, { childList: true });
+        } catch (e) {}
+      }
+      // 桌面设置窗口改语言/主题写在 SharedPreferences + localStorage，
+      // 编辑器窗口会收到 storage；切回前台也重新校验一次
+      window.addEventListener('storage', function () { guardLayout(); });
+      window.addEventListener('pageshow', function () { guardLayout(); refresh(); });
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) { guardLayout(); refresh(); }
+      });
 
       // GUI 异步挂载：轮询等待 tab-list 与 Blockly workspace 就绪
       var booted = false;
@@ -1573,13 +1764,23 @@
           ensureStageButton();
           ensureAddButtons();
           syncTabClass();
-          if (!booted) booted = installBlockly();
+          // workspace 被重建 / 补丁被重置时重新挂上纵向排列分区
+          if (!booted || (curLayout === 'vertical' && !patchAlive())) booted = installBlockly();
         }
         if (++bootTries > 100) clearInterval(bootTimer);
       }, 300);
-      // 长期保活：React 重建 tab-list / main-menu 后补回自定义按钮（轻量）
+      // 长期保活：React 重建 tab-list / main-menu 后补回自定义按钮（轻量）；
+      // 同时兜底校验布局 class / 样式表，以及 reload 后同步桥的返回值
       setInterval(function () {
         if (active()) { tidyMenuBar(); ensureStageButton(); ensureAddButtons(); syncTabClass(); layoutFindBar(); }
+        if (!layoutFromEvent) {
+          var v = readLayout();
+          if (v !== curLayout) { curLayout = v; guardLayout(); }
+        }
+        guardLayout();
+        // 切语言/主题后 Blockly 可能重置 getMetrics，导致纵向分区失效；
+        // 只读标记检测，失效时才重挂（不会每轮 reflow）
+        if (active() && curLayout === 'vertical' && !patchAlive()) installBlockly();
       }, 1500);
 
       var rzTimer;
@@ -1641,7 +1842,59 @@
     stageDetached: null, stageReattached: null, detachedStageInput: null
   };
 
+  /* 语言全局同步：桌面设置里切换语言后，Java 会广播 locale-changed。
+     非编辑器窗口刷新页面重新读取 effectiveLocale() 即可；桌面设置窗口
+     自己会 reload，不在这里处理；编辑器窗口单独处理（见下方）。 */
+  if (WIN_TYPE !== 'editor' && WIN_TYPE !== 'desktop-settings') {
+    on(WIN_TYPE, 'locale-changed', function () {
+      try { location.reload(); } catch (e) {}
+    });
+  }
+
   if (WIN_TYPE === 'editor') {
+    /* 桌面设置 → 编辑器：GUI 的语言由 localStorage['tw:language'] 与
+       redux locales 共同决定，直接改这两处就能即时生效，绝不能 reload
+       （reload 会丢失用户正在编辑的项目）。 */
+    function applyGuiLocale(loc) {
+      if (!loc) return;
+      try { localStorage.setItem('tw:language', loc); } catch (e) {}
+      try {
+        var store = window.ReduxStore;
+        if (store && store.dispatch) {
+          store.dispatch({ type: 'scratch-gui/locales/SELECT_LOCALE', locale: loc });
+        }
+      } catch (e) {}
+    }
+    on('editor', 'locale-changed', function (data) {
+      applyGuiLocale(data && data.locale);
+    });
+    /* 启动校准：切语言时编辑器窗口可能没打开，宿主已记住语言。等
+       ReduxStore 就绪后把 GUI 校准到宿主记录的原始语言代码。 */
+    (function calibrateLocale() {
+      var tries = 0;
+      (function wait() {
+        if (window.ReduxStore && window.ReduxStore.dispatch) {
+          var raw = sync('getGuiLocale');
+          var cur = null;
+          try { cur = localStorage.getItem('tw:language'); } catch (e) {}
+          if (raw && raw !== cur) applyGuiLocale(raw);
+          return;
+        }
+        if (tries++ < 60) setTimeout(wait, 200);
+      })();
+    })();
+    /* 编辑器 → Java：在设置菜单里选语言时 GUI 自己会写 tw:language，
+       这里把它回写给宿主，让首页 / 桌面设置等窗口也用同一份语言。 */
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!t || !t.closest || !t.closest('[class*="settings-menu_language-menu-item_"]')) return;
+      setTimeout(function () {
+        var v = null;
+        try { v = localStorage.getItem('tw:language'); } catch (err) {}
+        if (v) sync('setLocale', { locale: v });
+      }, 0);
+    }, false);
+
     // 编辑器作为服务端：响应 hub 转发来的请求
     editorRequests['ai-tool'] = function (payload) {
       return new Promise(function (resolve) {
@@ -1847,8 +2100,29 @@
     },
     onRequestTheme: function (callback) { deliverQueue['request-theme'] = [callback]; },
     sendTheme: function (data) { replyPending(pendingTheme, data); },
-    notifyThemeChanged: function (theme) { return inv('notifyThemeChanged', { theme: theme }); },
-    getGlobalUITheme: function () { return inv('getGlobalUITheme'); },
+    /* Android 上 GUI 自带一条桌面版主题同步链：切主题 → notifyThemeChanged →
+       Java broadcastTheme → 又把 global-ui-theme-changed 广播回 editor 自己 →
+       applyGlobalUITheme 再次 dispatch setTheme，形成自我回环；且广播会给每个
+       窗口调 applySystemBarTheme() 重设系统栏，表现为「闪一下亮色又跳回暗色、
+       UI 半亮半暗错乱」。这里截断该上行通知，主题完全由 GUI 自己的
+       setTheme + persistTheme 决定。桌面设置里主动改主题仍走 Java
+       broadcastTheme → onGlobalUIThemeChanged，那条链路保留且有效。 */
+    notifyThemeChanged: function () { return Promise.resolve(); },
+    /* 启动时不让 Java 的 effectiveTheme()（默认 system）覆盖用户持久化的
+       tw:theme：返回 GUI 自己 localStorage 里已选的主题，使
+       applyGlobalUITheme(mode) 成为无操作；从未选过则保持跟随系统语义。 */
+    getGlobalUITheme: function () {
+      var t = 'system';
+      try {
+        var raw = window.localStorage.getItem('tw:theme');
+        if (raw === 'dark' || raw === 'light') t = raw;
+        else {
+          var o = JSON.parse(raw);
+          if (o && (o.gui === 'dark' || o.gui === 'light')) t = o.gui;
+        }
+      } catch (e) {}
+      return Promise.resolve(t);
+    },
     onGlobalUIThemeChanged: function (callback) { on('editor', 'global-ui-theme-changed', callback); },
     onRequestSpriteStats: function (callback) { deliverQueue['request-sprite-stats'] = [callback]; },
     sendSpriteStats: function (data) { replyPending(pendingSpriteStats, data); },
