@@ -1406,6 +1406,53 @@
       /* 状态互斥 */
       body.nw-detail .sidebar { display: none; }
       body:not(.nw-detail) .content { display: none; }
+
+      /* ===== 动效：Apple 风格克制的弹性反馈 ===== */
+      /* 首页：列表分组依次轻盈浮现（交错） */
+      @keyframes nw-rise {
+        from { opacity: 0; transform: translateY(14px); }
+        to   { opacity: 1; transform: none; }
+      }
+      body:not(.nw-detail) .sidebar-header { animation: nw-rise .42s var(--ease) both; }
+      body:not(.nw-detail) .nav:nth-of-type(1) { animation: nw-rise .44s var(--ease) .05s both; }
+      body:not(.nw-detail) .nav:nth-of-type(2) { animation: nw-rise .44s var(--ease) .11s both; }
+      body:not(.nw-detail) .sidebar-footer { animation: nw-rise .44s var(--ease) .17s both; }
+      /* 列表项：按住轻微缩小回弹；图标随按压缩放 */
+      .nav-item {
+        transition: background .16s var(--ease), transform .18s var(--ease);
+        -webkit-tap-highlight-color: transparent;
+      }
+      .nav-item:active { transform: scale(.975); }
+      .nav-item .nav-icon { transition: transform .22s var(--ease); }
+      .nav-item:active .nav-icon { transform: scale(.9); }
+      .nav-item.selected .nav-icon { animation: nw-icon-pop .34s var(--ease); }
+      @keyframes nw-icon-pop {
+        0% { transform: scale(1); }
+        45% { transform: scale(1.16); }
+        100% { transform: scale(1); }
+      }
+      /* 二级页：内容卡片交错浮现；返回栏文字轻入 */
+      body.nw-detail .page.active .card {
+        animation: nw-rise .4s var(--ease) both;
+      }
+      body.nw-detail .page.active .card:nth-child(2) { animation-delay: .04s; }
+      body.nw-detail .page.active .card:nth-child(3) { animation-delay: .08s; }
+      body.nw-detail .page.active .card:nth-child(4) { animation-delay: .12s; }
+      .detail-title { animation: nw-rise .34s var(--ease) .06s both; }
+      .detail-back:active { transform: scale(.94); }
+      .detail-back { transition: transform .16s var(--ease), opacity .16s var(--ease); }
+      /* 主题 / 配色切换：色彩变化平滑过渡 */
+      body, .nav, .card, .detail-nav, .setting-row {
+        transition-property: background-color, border-color, color;
+        transition-duration: .28s;
+        transition-timing-function: var(--ease);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .sidebar-header, .nav, .sidebar-footer, .page.active .card,
+        .detail-title, .nav-item.selected .nav-icon { animation: none !important; }
+        .nav-item, .nav-item .nav-icon, .detail-back,
+        body, .card, .detail-nav, .setting-row { transition: none !important; }
+      }
     </style>
   </head>
   <body>

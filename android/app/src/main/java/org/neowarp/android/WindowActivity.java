@@ -102,9 +102,10 @@ public class WindowActivity extends NWActivity {
         // 前置既有窗口；payload 类参数（如插件文档路径）此场景忽略
     }
 
-    /** 主页（页面型布局）内容延伸进状态栏；编辑器等 app 布局保持状态栏下方 */
+    /** 页面型布局（主页 / 桌面设置）内容延伸进状态栏，状态栏透明沉浸式；
+     *  编辑器等 app 布局保持状态栏下方。页面内部再用 safe-area 避让状态栏文字。 */
     @Override
     protected boolean extendIntoStatusBar() {
-        return "home".equals(windowType);
+        return "home".equals(windowType) || "desktop-settings".equals(windowType);
     }
 }

@@ -290,8 +290,12 @@
       var c = mv.getAttribute('content') || 'width=device-width, initial-scale=1';
       if (c.indexOf('viewport-fit') < 0) mv.setAttribute('content', c + ', viewport-fit=cover');
       // 内容避开状态栏/手势条（背景层 fixed inset:0 仍铺满全屏）
-      var css = ':root{--nw-sat:env(safe-area-inset-top,0px);--nw-sab:env(safe-area-inset-bottom,0px)}'
-        + 'body{padding-top:var(--nw-sat) !important;padding-bottom:var(--nw-sab) !important}';
+      var css = ':root{--nw-sat:env(safe-area-inset-top,0px);--nw-sab:env(safe-area-inset-bottom,0px)}';
+      // 桌面设置是单页 100dvh 布局，body 外推 padding 会把整页顶出屏幕，
+      // 改由内部滚动容器 / sticky 导航栏各自避让（见下方 desktop-settings 分支）
+      if (WIN_TYPE !== 'desktop-settings') {
+        css += 'body{padding-top:var(--nw-sat) !important;padding-bottom:var(--nw-sab) !important}';
+      }
       if (WIN_TYPE === 'home') {
         // 右下角悬浮按钮与提示气泡避让手势条
         css += '#github-button,#settings-button{bottom:calc(26px + var(--nw-sab)) !important}'
@@ -366,6 +370,22 @@
           + '}';
       }
       if (WIN_TYPE === 'desktop-settings') {
+        // 全屏沉浸：页面内容延伸进状态栏（Java 侧 extendIntoStatusBar 已开启），
+        // 背景铺满整屏；由.header / detail-nav / 列表各自用安全区避让系统栏文字。
+        css += '.layout{height:100dvh !important}'
+          + '.sidebar{padding-top:var(--nw-sat) !important;padding-bottom:var(--nw-sab) !important}'
+          + '.sidebar-header{padding-top:calc(20px + var(--nw-sat)) !important}'
+          + 'body.nw-detail .detail-nav{top:0 !important;'
+          + 'padding-top:var(--nw-sat) !important;height:calc(52px + var(--nw-sat)) !important}'
+          + '.content{padding-bottom:calc(44px + var(--nw-sab)) !important}'
+          + '.sidebar-footer{padding-bottom:calc(32px + var(--nw-sab)) !important}';
+        // 二级页 iOS 风格滑入 / 首页回退滑入（首页 sidebar 与二级页 content 互斥显示）
+        css += 'body.nw-detail .content{animation:nw-detail-in .32s var(--ease) both !important}'
+          + 'body:not(.nw-detail) .sidebar{animation:nw-root-in .30s var(--ease) both !important}'
+          + '@keyframes nw-detail-in{from{opacity:0;transform:translateX(26px)}to{opacity:1;transform:none}}'
+          + '@keyframes nw-root-in{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}'
+          + '@media (prefers-reduced-motion:reduce){'
+          + 'body.nw-detail .content,body:not(.nw-detail) .sidebar{animation:none !important}}';
         // 竖屏适配：主页 logo 行的控件区含图片预览 + HTML预览 + 两个按钮，
         // 加上 flex-shrink:0 会在窄屏把左侧标题挤成竖排单字，故整行改为纵向堆叠
         css += '@media (max-width:620px){'
