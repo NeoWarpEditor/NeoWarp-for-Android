@@ -19,11 +19,11 @@ public class WindowActivity extends NWActivity {
     private static final String EXTRA_TYPE = "nw.type";
     private static final String EXTRA_PAYLOAD = "nw.payload";
 
-    /** 以浮动卡片形式叠在编辑器之上的窗口（对应桌面版的非模态小窗） */
+    /** 以浮动卡片形式叠在编辑器之上的窗口（对应桌面版的非模态小窗）。
+     *  SOLO 是全屏 AI 编程窗口，不在此列——须占满整屏，而非缩小成卡片。 */
     private static boolean isFloatingType(String type) {
         switch (type) {
             case "ai-assistant":
-            case "solo":
             case "collaboration":
             case "task-manager":
             case "project-analysis":
