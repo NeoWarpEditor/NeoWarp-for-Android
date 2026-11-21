@@ -579,6 +579,11 @@
            会被上面的 22px 规则放大成 22×22 占位——由 JS tidyMenuBar 按
            naturalWidth=8 && naturalHeight=5 特征隐藏。本条兜底带类名变体 */
         P + '[class*="menu-bar_dropdown-caret-icon_"]{display:none !important;margin:0 !important}',
+        /* 子菜单项右侧的白色展开小三角（settings-menu_expand-caret，8×5 SVG
+           被上面的 main-menu img→22px 规则放成大三角）：又丑又会在展开状态
+           切换时旋转/重渲染闪烁。竖屏下直接隐藏，子菜单仍可点开（见
+           bindSubmenuToggle），用户靠文字即可识别可展开项。 */
+        P + '[class*="settings-menu_expand-caret_"]{display:none !important}',
         P + '[class*="menu-bar_main-menu_"]{margin:0 !important;flex:1 1 auto !important;'
           + 'justify-content:space-between !important}',
         /* menu-bar 末尾还有个直属菜单项（问号），它参与 flex 分配会把
@@ -592,8 +597,10 @@
         /* 下拉菜单：外层 wrapper 是 static 改了无效，必须钉住内层 ul.menu_。
            工具栏在屏幕底部，菜单原生向下弹出会整体落到屏幕外（表现为点不开），
            这里统一固定到工具栏上方。 */
+        /* 一级菜单水平位置不再写死左下角：由 alignMenus() 按触发它的
+           工具栏按钮 x 坐标写入 --nw-menu-x，clamp 到屏幕内；默认 8px */
         P + '[class*="menu-bar_menu-bar-menu_"] > [class*="menu_menu_"]{'
-          + 'position:fixed !important;left:8px !important;right:auto !important;'
+          + 'position:fixed !important;left:var(--nw-menu-x, 8px) !important;right:auto !important;'
           + 'top:auto !important;bottom:calc(var(--nw-menu-h) + 4px) !important;'
           + 'max-height:52vh !important;overflow-y:auto !important;z-index:130 !important;margin:0 !important;'
           /* 原生只有下方 8px 圆角（菜单挂在工具栏下沿）；改到工具栏上方后需四角圆角 */
@@ -1230,6 +1237,74 @@
         document.addEventListener('click', function (e) { toggleFrom(e.target); }, true);
       }
 
+      /* ---------------- 图一：一级菜单按触发按钮水平对齐 ----------------
+         底部工具栏 7 个图标从左到右排列，但所有下拉菜单在桌面 DOM 里都
+         position:absolute 挂在各自 menu-bar-item 下；竖屏为让菜单浮到工具
+         栏上方改成 position:fixed，fixed 脱离了按钮这个定位父级，全部堆到
+         left:8px 左下角。这里在菜单展开后，读出真正触发它的按钮（即该菜单
+         wrapper 的父级 menu-bar-menu_ 所在的那个可见 menu-bar-item）的
+         x 坐标，写入 --nw-menu-x，让菜单贴着按钮弹出；同时 clamp 到屏幕内，
+         保证最右侧「更多」按钮的菜单不会跑出右边。
+         触发时机：菜单是 React 条件渲染，用 MutationObserver 盯着工具栏，
+         一旦有菜单 wrapper/ul 出现就重排。 */
+      function alignMenus() {
+        if (!active()) return;
+        var wrappers = document.querySelectorAll('[class*="menu-bar_menu-bar-menu_"]');
+        for (var i = 0; i < wrappers.length; i++) {
+          var w = wrappers[i];
+          var ul = w.querySelector('[class*="menu_menu_"]');
+          if (!ul) continue;
+          var r = ul.getBoundingClientRect();
+          // 只处理当前可见（已展开）的菜单
+          if (r.width < 2 || r.height < 2) continue;
+          // 找宿主按钮：wrapper 的父级 menu-bar-item，取其中可见的 button/img 左缘
+          var item = w.closest('[class*="menu-bar_menu-bar-item_"]');
+          var btn = item ? (item.querySelector('[class*="menu-bar_menu-bar-button_"]') || item) : null;
+          var br = btn ? btn.getBoundingClientRect() : null;
+          if (!br || br.width < 2) continue;
+          var x = br.left;
+          var max = window.innerWidth - r.width - 8;
+          if (x > max) x = max;
+          if (x < 8) x = 8;
+          x = Math.round(x);
+          // 值没变就不写：否则下面 observer 观察 style 会自触发死循环
+          if (ul.getAttribute('data-nw-menu-x') === String(x)) continue;
+          ul.setAttribute('data-nw-menu-x', String(x));
+          ul.style.setProperty('--nw-menu-x', x + 'px', 'important');
+        }
+      }
+      function bindMenuAlign() {
+        // 监听必须无条件挂一次：main-menu 是 React 异步渲染的，本函数首次
+        // 执行时它往往还没进 DOM，若在此之前 return 会导致监听器永远缺失。
+        if (!bindMenuAlign.attached) {
+          bindMenuAlign.attached = true;
+          // 菜单展开/收起都改 DOM，捕获阶段点击后多帧各排一次
+          document.addEventListener('click', function () {
+            setTimeout(alignMenus, 0);
+            setTimeout(alignMenus, 60);
+            setTimeout(alignMenus, 200);
+          }, true);
+          document.addEventListener('touchstart', function () { setTimeout(alignMenus, 80); }, true);
+          window.addEventListener('resize', alignMenus);
+          // 保活：菜单也可能由 hover / 异步渲染打开，定时器兜底；alignMenus
+          // 内部有「值相同就不写」保护，空闲时几乎零开销。
+          bindMenuAlign.timer = setInterval(alignMenus, 400);
+        }
+        var mm = document.querySelector('[class*="menu-bar_main-menu_"]');
+        if (!mm) return;
+        if (!bindMenuAlign.obs && window.MutationObserver) {
+          bindMenuAlign.obs = new MutationObserver(function () { alignMenus(); });
+        }
+        if (bindMenuAlign.obs && bindMenuAlign.observedEl !== mm) {
+          try {
+            bindMenuAlign.obs.observe(mm, { childList: true, subtree: true, attributes: true,
+              attributeFilter: ['class'] });
+            bindMenuAlign.observedEl = mm;
+          } catch (e) { /* ignore */ }
+        }
+        alignMenus();
+      }
+
       /* ---------------- 舞台按钮（切换全屏舞台，复用 GUI 原生 action） ---------------- */
       var stageBtn = null;
       function toggleFullStage() {
@@ -1727,6 +1802,7 @@
 
       injectCss();
       bindSubmenuToggle();
+      bindMenuAlign();
       refresh();
 
       /* ---------------- 布局状态自愈 ----------------
@@ -2021,7 +2097,27 @@
     sendAIListenersReady: function () { return inv('aiListenersReady'); },
     onImportCostume: function (cb) { on('editor', 'import-costume', cb); },
     sendImportCostumeResult: function (data) { return inv('importCostumeResult', data || {}); },
-    openNewWindow: function () { return inv('openNewWindow', { type: 'editor' }); },
+    /* 「新窗口」改为「当前页面新建项目」：不再另开 Android Activity，
+       直接走 scratch-gui 的 new-project action，与当前编辑器实例共用同一页面。
+       START_FETCHING_NEW 等价于菜单 File→New（不需要先保存的场景），会重新
+       拉取默认空白项目并复位项目状态。 */
+    newProject: function () {
+      var store = window.ReduxStore;
+      if (!store || typeof store.dispatch !== 'function') return false;
+      try {
+        // reducer 会把 loadingState 置为 FETCHING_NEW_DEFAULT 并把 projectId
+        // 设为 defaultProjectId，fetcher 随即拉取默认空白项目——不要再手动
+        // 改 projectId，否则会覆盖 reducer 刚设好的默认 id。
+        store.dispatch({ type: 'scratch-gui/project-state/START_FETCHING_NEW' });
+        return true;
+      } catch (e) { return false; }
+    },
+    openNewWindow: function () {
+      var ok = this.newProject();
+      if (ok) return true;
+      // Redux 尚未就绪时兜底：仍尝试开新窗口，避免按钮完全无响应
+      return inv('openNewWindow', { type: 'editor' });
+    },
     openAddonSettings: function (search) { return inv('openWindow', { type: 'addons', search: search || '' }); },
     openPackager: function () { return inv('openWindow', { type: 'packager' }); },
     showEncryptedSaveFilePicker: function (suggestedName) {
