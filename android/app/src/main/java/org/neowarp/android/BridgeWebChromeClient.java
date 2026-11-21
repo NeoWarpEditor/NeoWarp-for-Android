@@ -59,20 +59,29 @@ public class BridgeWebChromeClient extends WebChromeClient {
     }
 
     private void showJsDialog(String message, String promptDefault, Object result, boolean cancellable) {
-        new AlertDialog.Builder(activity)
+        AlertDialog.Builder builder = new AlertDialog.Builder(activity)
                 .setTitle("NeoWarp")
                 .setMessage(message)
-                .setPositiveButton("OK", (d, w) -> {
+                .setPositiveButton("确定", (d, w) -> {
                     if (result instanceof JsResult) ((JsResult) result).confirm();
                     else if (result instanceof JsPromptResult)
                         ((JsPromptResult) result).confirm(promptDefault == null ? "" : promptDefault);
-                })
-                .setOnCancelListener(d -> {
-                    if (result instanceof JsResult) ((JsResult) result).cancel();
-                    else if (result instanceof JsPromptResult) ((JsPromptResult) result).cancel();
-                })
-                .setCancelable(cancellable)
-                .show();
+                });
+        // confirm / prompt 必须提供「取消」：点它等价于 JS confirm 返回 false，
+        // 让调用方（如「新作品」未保存确认）走取消分支，而不是强制继续。
+        // alert 只有确定，不给取消。
+        if (cancellable) {
+            builder.setNegativeButton("取消", (d, w) -> {
+                if (result instanceof JsResult) ((JsResult) result).cancel();
+                else if (result instanceof JsPromptResult) ((JsPromptResult) result).cancel();
+            });
+        }
+        builder.setOnCancelListener(d -> {
+            if (result instanceof JsResult) ((JsResult) result).cancel();
+            else if (result instanceof JsPromptResult) ((JsPromptResult) result).cancel();
+        })
+        .setCancelable(cancellable)
+        .show();
     }
 
     /* ---------------- 麦克风 / 摄像头（视频侦测、录音扩展） ---------------- */

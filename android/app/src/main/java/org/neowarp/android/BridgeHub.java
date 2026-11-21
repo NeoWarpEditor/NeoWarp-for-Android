@@ -409,8 +409,15 @@ public class BridgeHub {
     }
 
     public void rpcAsync(String winType, String method, String argsJson, String cbId) {
+        rpcAsync(winType, method, argsJson, cbId, null);
+    }
+
+    /** explicitCaller 由注入到具体 WebView 的 NeoWarpBridge 传入：
+     *  多开同类型窗口（如两个 editor）时，reply 必须回投给真正发起调用的窗口，
+     *  否则 findFirstByType 会命中旧窗口，新窗口所有 invoke 都拿不到回调。 */
+    public void rpcAsync(String winType, String method, String argsJson, String cbId, NWActivity explicitCaller) {
         JSONObject args = parse(argsJson);
-        NWActivity caller = findFirstByType(winType);
+        NWActivity caller = explicitCaller != null ? explicitCaller : findFirstByType(winType);
         if (cbId != null && caller != null) cbOwners.put(cbId, caller); // reply 回投定位
         try {
             dispatch(winType, method, args, cbId, caller);

@@ -28,7 +28,8 @@ public class NeoWarpBridge {
     /** 异步调用（对应 ipcRenderer.invoke；结果经 __nw.cb 回投 JS） */
     @JavascriptInterface
     public void rpcAsync(String winType, String method, String argsJson, String cbId) {
-        BridgeHub.get(activity).rpcAsync(windowType, method, argsJson, cbId);
+        // 传入本 WebView 所属的 activity，保证多开同类型窗口时回调投给发起方自己
+        BridgeHub.get(activity).rpcAsync(windowType, method, argsJson, cbId, activity);
     }
 
     /** 编辑器服务端请求的响应回传（sendProjectJSON / sendAIToolResponse / ...） */

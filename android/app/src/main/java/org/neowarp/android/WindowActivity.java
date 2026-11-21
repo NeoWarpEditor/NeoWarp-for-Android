@@ -55,14 +55,16 @@ public class WindowActivity extends NWActivity {
         ctx.startActivity(i);
     }
 
-    /** 强制新建一个窗口（不复用已有同类型实例），用于编辑器「新窗口」菜单项。 */
+    /** 强制新建一个窗口（不复用已有同类型实例），用于编辑器「新窗口」菜单项。
+     *  「新窗口」语义 = 再开一个独立编辑器，和当前窗口分属两个任务栈：
+     *  最近任务里显示成两个独立条目，返回键不会退回原编辑器，两者互不干扰。 */
     public static void showNew(Context ctx, String type, @Nullable String payloadJson) {
         Intent i = new Intent(ctx, WindowActivity.class);
         i.putExtra(EXTRA_TYPE, type);
         if (payloadJson != null) i.putExtra(EXTRA_PAYLOAD, payloadJson);
-        if (!(ctx instanceof android.app.Activity)) {
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
+        // NEW_TASK + MULTIPLE_TASK：即使已有同类型窗口也必定新建独立任务栈，
+        // 等价于桌面上「再开一个软件」，而不是在当前 task 内压入一个新页面。
+        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_MULTIPLE_TASK);
         ctx.startActivity(i);
     }
 
