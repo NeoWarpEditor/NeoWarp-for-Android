@@ -1998,7 +1998,10 @@
     showOpenFilePicker: function () { return inv('showOpenFilePicker'); },
     setLocale: function (locale) {
       sync('setLocale', { locale: locale });
-      return { strings: {} };
+      // GUI 依赖返回 { strings } 更新 this.messages；此前返回空对象导致
+      // 加密保存弹窗按钮/占位符、in-app-about 等全部 undefined 或英文 fallback。
+      var strs = sync('getGuiStrings');
+      return { strings: strs || {} };
     },
     setChanged: function (changed) { return inv('setChanged', { changed: !!changed }); },
     // ---- 2.3.0 编辑器新增契约 ----
@@ -2018,7 +2021,7 @@
     sendAIListenersReady: function () { return inv('aiListenersReady'); },
     onImportCostume: function (cb) { on('editor', 'import-costume', cb); },
     sendImportCostumeResult: function (data) { return inv('importCostumeResult', data || {}); },
-    openNewWindow: function () { return inv('openWindow', { type: 'editor' }); },
+    openNewWindow: function () { return inv('openNewWindow', { type: 'editor' }); },
     openAddonSettings: function (search) { return inv('openWindow', { type: 'addons', search: search || '' }); },
     openPackager: function () { return inv('openWindow', { type: 'packager' }); },
     showEncryptedSaveFilePicker: function (suggestedName) {

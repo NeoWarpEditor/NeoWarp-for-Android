@@ -334,6 +334,8 @@ public class BridgeHub {
                 }
                 // 返回未经归一化的原始语言代码，供编辑器写入 tw:language
                 case "getGuiLocale": return jstr(settings().getString("locale", ""));
+                // 编辑器 GUI 的 l10n 字符串表（setLocale 后需要它更新 this.messages）
+                case "getGuiStrings": return loadStrings(effectiveLocale()).toString();
                 case "getCodeAreaBackgroundImage": return jstr(settingsOpt("codeAreaBackgroundImage"));
                 case "getStageAreaBackgroundImage": return jstr(settingsOpt("stageAreaBackgroundImage"));
                 case "getTopBarDeviceStats": return jstr(false); // Android 顶部不显示 CPU/内存
@@ -442,6 +444,13 @@ public class BridgeHub {
                     payload = new JSONObject().put("search", args.optString("search"));
                 }
                 WindowActivity.show(caller, type, payload == null ? null : payload.toString());
+                reply(cbId, ok());
+                return;
+            }
+            case "openNewWindow": {
+                // 编辑器「新窗口」：强制新建编辑器实例，不走单例前置复用
+                String type = args == null ? "editor" : args.optString("type", "editor");
+                WindowActivity.showNew(caller, type, null);
                 reply(cbId, ok());
                 return;
             }
@@ -2058,7 +2067,7 @@ public class BridgeHub {
         try {
             return app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName;
         } catch (Exception e) {
-            return "0.0.3";
+            return "0.0.4";
         }
     }
 

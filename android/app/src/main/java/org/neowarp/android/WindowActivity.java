@@ -55,6 +55,17 @@ public class WindowActivity extends NWActivity {
         ctx.startActivity(i);
     }
 
+    /** 强制新建一个窗口（不复用已有同类型实例），用于编辑器「新窗口」菜单项。 */
+    public static void showNew(Context ctx, String type, @Nullable String payloadJson) {
+        Intent i = new Intent(ctx, WindowActivity.class);
+        i.putExtra(EXTRA_TYPE, type);
+        if (payloadJson != null) i.putExtra(EXTRA_PAYLOAD, payloadJson);
+        if (!(ctx instanceof android.app.Activity)) {
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        ctx.startActivity(i);
+    }
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         String type = getIntent().getStringExtra(EXTRA_TYPE);

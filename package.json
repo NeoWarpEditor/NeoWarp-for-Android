@@ -1,6 +1,6 @@
 {
   "name": "neowarp-android",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "description": "NeoWarp Android shell (Capacitor)",
   "dependencies": {
