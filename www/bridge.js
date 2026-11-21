@@ -2069,7 +2069,19 @@
 
   window.EditorPreload = {
     isInitiallyFullscreen: function () { return sync('isInitiallyFullscreen') || false; },
-    getInitialFile: function () { return inv('getInitialFile'); },
+    getInitialFile: function () {
+      // GUI 契约（对齐桌面版/网页版）：返回「直接的文件 id 字符串」，随后
+      // getFile(id) 用它取文件。Java 侧历史返回的是 {id:"h..."} 对象，直接
+      // 透传会让 GUI 把整个对象当 id 传给 getFileInfo，导致 handle 找不到 →
+      // "File not found"（从主页/最近项目打开 sb3 必现）。这里统一解包成 id。
+      return inv('getInitialFile').then(function (r) {
+        if (r && typeof r === 'object' && !Array.isArray(r)) {
+          if (r.id !== undefined && r.id !== null) return r.id;
+          return null;
+        }
+        return r;
+      });
+    },
     getFile: function (id) {
       return inv('getFileInfo', { id: id }).then(function (info) {
         if (!info) throw new Error('File not found');
