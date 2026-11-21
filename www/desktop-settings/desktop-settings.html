@@ -1508,6 +1508,7 @@
         display: grid; place-items: center; color: #fff;
       }
       .storage-card-icon svg { width: 22px; height: 22px; }
+      .storage-card-icon.binary { background: linear-gradient(135deg, #5AC8FA, #C86FFF); }
       .storage-card-icon.projects { background: linear-gradient(135deg, #34C759, #30D158); }
       .storage-card-icon.cache { background: linear-gradient(135deg, #5AC8FA, #0A84FF); }
       .storage-card-icon.other { background: linear-gradient(135deg, #FF9F0A, #FF9500); }
@@ -1985,6 +1986,18 @@
           </div>
 
           <div class="storage-card">
+            <div class="storage-card-icon binary">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><line x1="9" y1="18" x2="15" y2="18"></line></svg>
+            </div>
+            <div class="storage-card-body">
+              <div class="storage-card-title" id="storageAppBinaryTitle"></div>
+              <div class="storage-card-size"><span id="storageAppBinary">--</span><span class="u">MB</span></div>
+              <div class="storage-card-desc" id="storageAppBinaryDesc"></div>
+            </div>
+            <button class="storage-card-action" id="storageAppDetailBtn"></button>
+          </div>
+
+          <div class="storage-card">
             <div class="storage-card-icon projects">
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
             </div>
@@ -2216,6 +2229,8 @@
         document.getElementById('legendApp').textContent = S('desktop-settings.storage-app-used', 'NeoWarp 已用空间');
         document.getElementById('legendPhone').textContent = S('desktop-settings.storage-phone-used', '手机已用空间');
         document.getElementById('legendFree').textContent = S('desktop-settings.storage-phone-free', '手机可用空间');
+        document.getElementById('storageAppBinaryTitle').textContent = S('desktop-settings.storage-app-binary', '应用本体');
+        document.getElementById('storageAppBinaryDesc').textContent = S('desktop-settings.storage-app-binary-desc', '安装包、运行库与编译产物，卸载应用时移除。');
         document.getElementById('storageProjectsTitle').textContent = S('desktop-settings.storage-projects', '项目与文件');
         document.getElementById('storageProjectsDesc').textContent = S('desktop-settings.storage-projects-desc', '已保存的项目、角色、背景与下载的资源。');
         document.getElementById('storageCacheTitle').textContent = S('desktop-settings.storage-cache', '缓存数据');
@@ -2223,6 +2238,7 @@
         document.getElementById('storageOtherTitle').textContent = S('desktop-settings.storage-other', '其他数据');
         document.getElementById('storageOtherDesc').textContent = S('desktop-settings.storage-other-desc', '应用文件、设置及其他数据，清理需卸载重装应用。');
         document.getElementById('storageNote').textContent = S('desktop-settings.storage-desc', '管理 NeoWarp 在此设备上占用的空间。');
+        document.getElementById('storageAppDetailBtn').textContent = S('desktop-settings.storage-app-detail', '详情');
         document.getElementById('storageManageBtn').textContent = S('desktop-settings.storage-manage', '管理');
         document.getElementById('storageCleanBtn').textContent = S('desktop-settings.storage-clean', '清理');
         document.getElementById('storageViewBtn').textContent = S('desktop-settings.storage-view', '查看');
@@ -2260,7 +2276,7 @@
 
         window.loadStorage = async function () {
           const loading = S('desktop-settings.storage-loading', '正在计算...');
-          ['storageTotal','storageProjects','storageCache','storageOther'].forEach(id => document.getElementById(id).textContent = '··');
+          ['storageTotal','storageAppBinary','storageProjects','storageCache','storageOther'].forEach(id => document.getElementById(id).textContent = '··');
           document.getElementById('storageCenterLabel').textContent = loading;
           let info = null;
           try {
@@ -2283,6 +2299,7 @@
           document.querySelector('#storageTotal + .ring-unit').textContent = f.unit;
           const pct = total > 0 ? ((appUsed / total) * 100).toFixed(1) : '0';
           document.getElementById('storageCenterLabel').textContent = pct + '% · ' + S('desktop-settings.storage-center', '占用手机存储空间');
+          setSize('storageAppBinary', info.appBinary || 0);
           setSize('storageProjects', info.projects || 0);
           setSize('storageCache', info.cache || 0);
           setSize('storageOther', info.other || 0);
@@ -2322,6 +2339,12 @@
         };
         document.getElementById('storageManageBtn').addEventListener('click', openData);
         document.getElementById('storageViewBtn').addEventListener('click', openData);
+        document.getElementById('storageAppDetailBtn').addEventListener('click', () => {
+          try {
+            if (window.DesktopSettingsPreload && DesktopSettingsPreload.openAppDetails) DesktopSettingsPreload.openAppDetails();
+            else openData();
+          } catch (e) { openData(); }
+        });
       })();
 
       // ===== Check for updates =====

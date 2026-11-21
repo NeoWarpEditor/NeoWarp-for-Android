@@ -2419,7 +2419,8 @@
       getTheme: function () { return inv('getTheme'); },
       onThemeChanged: function (callback) { on('desktop-settings', 'theme-changed', callback); },
       getStorageInfo: function () { return inv('getStorageInfo'); },
-      clearCache: function () { return inv('clearCache'); }
+      clearCache: function () { return inv('clearCache'); },
+      openAppDetails: function () { return inv('openAppDetails'); }
     };
   }
 

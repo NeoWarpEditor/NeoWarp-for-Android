@@ -671,6 +671,18 @@ public class BridgeHub {
             case "getAISystemInfo": reply(cbId, aiSystemInfo().toString()); return;
             case "getStorageInfo": reply(cbId, storageInfo().toString()); return;
             case "clearCache": reply(cbId, clearAppCache().toString()); return;
+            case "openAppDetails": {
+                try {
+                    android.content.Intent intent = new android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    intent.setData(android.net.Uri.parse("package:" + caller.getPackageName()));
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
+                    caller.startActivity(intent);
+                    reply(cbId, ok());
+                } catch (Exception e) {
+                    reply(cbId, new JSONObject().put("ok", false).put("error", String.valueOf(e)).toString());
+                }
+                return;
+            }
             case "getPreferredMediaDevices": {
                 JSONObject o = new JSONObject();
                 o.put("microphone", settingsOpt("microphone"));
@@ -2250,9 +2262,10 @@ public class BridgeHub {
     }
 
     /**
-     * 储存空间分析：项目文件 / 缓存 / 其他 + 系统总空间与可用空间（字节）。
-     * 口径：应用私有目录 dataDir 下，cache=cacheDir，projects=filesDir 内的 ProjectData/项目，
-     * 其余归入 other；系统空间取内部存储 StatFs。
+     * 储存空间分析：应用本体 / 项目文件 / 缓存 / 其他 + 系统总空间与可用空间（字节）。
+     * 口径：appBinary=APK 本体(+split)+native 库+oat/dex（软件自身占用，之前漏算），
+     * cache=cacheDir，projects=filesDir 内的 ProjectData/项目，其余 data 与外部私有目录归 other；
+     * appUsed = appBinary + cache + projects + other；系统空间取内部存储 StatFs。
      */
     private JSONObject storageInfo() {
         JSONObject o = new JSONObject();
@@ -2274,6 +2287,32 @@ public class BridgeHub {
             long external = dirSize(ext);
             other += external;
 
+            // 应用自身占用（软件本体）：APK 本体 + split APK + native 库 + oat/dex。
+            // 这些在 /data/app 下，普通应用可读自身 APK 路径与文件大小。
+            long appBinary = 0;
+            try {
+                android.content.pm.ApplicationInfo ai = app.getApplicationInfo();
+                if (ai.sourceDir != null) {
+                    java.io.File base = new java.io.File(ai.sourceDir);
+                    if (base.exists()) appBinary += base.length();
+                }
+                if (ai.splitSourceDirs != null) {
+                    for (String sp : ai.splitSourceDirs) {
+                        java.io.File sf = new java.io.File(sp);
+                        if (sf.exists()) appBinary += sf.length();
+                    }
+                }
+                if (ai.nativeLibraryDir != null) {
+                    appBinary += dirSize(new java.io.File(ai.nativeLibraryDir));
+                }
+                // oat 目录与 APK 同级（/data/app/~~xxx/pkg-xxx/oat），ART 编译产物
+                if (ai.sourceDir != null) {
+                    java.io.File oat = new java.io.File(new java.io.File(ai.sourceDir).getParentFile(), "oat");
+                    appBinary += dirSize(oat);
+                }
+            } catch (Exception ignored) {
+            }
+
             long total = 0, available = 0;
             try {
                 android.os.StatFs stat = new android.os.StatFs(android.os.Environment.getDataDirectory().getPath());
@@ -2287,10 +2326,11 @@ public class BridgeHub {
             } catch (Exception ignored) {
             }
 
+            o.put("appBinary", appBinary);
             o.put("cache", cache);
             o.put("projects", projects);
             o.put("other", other);
-            o.put("appUsed", cache + projects + other);
+            o.put("appUsed", appBinary + cache + projects + other);
             o.put("total", total);
             o.put("available", available);
         } catch (Exception e) {
