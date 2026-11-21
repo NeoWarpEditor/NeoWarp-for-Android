@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
       :root {
-        --bg: #F5F5F7;
-        --window-bg:
-          radial-gradient(1100px 640px at 90% -12%, rgba(10, 122, 255, 0.07) 0%, rgba(10, 122, 255, 0) 58%),
-          radial-gradient(880px 560px at -12% 110%, rgba(94, 92, 230, 0.06) 0%, rgba(94, 92, 230, 0) 60%),
-          linear-gradient(160deg, #F1F0F6 0%, #F6F5F9 48%, #EEF3FA 100%);
-        --sidebar-bg: rgba(255, 255, 255, 0.66);
+        /* MIUI 风格：浅灰背景 + 白色分组卡片
+           注意 --window-bg 必须是一个 image（渐变），因为 body 用
+           `background: var(--window-bg) var(--bg)`，写成纯色会让声明失效 */
+        --bg: #F4F4F6;
+        --window-bg: linear-gradient(#F4F4F6, #F4F4F6);
+        --sidebar-bg: rgba(255, 255, 255, 0.94);
         --card-bg: #FFFFFF;
-        --card-border: rgba(17, 22, 45, 0.07);
-        --card-border-strong: rgba(17, 22, 45, 0.13);
+        --card-border: rgba(17, 22, 45, 0.055);
+        --card-border-strong: rgba(17, 22, 45, 0.12);
         --text: #16181D;
         --text-secondary: #6E7078;
         --text-tertiary: #A4A6AD;
@@ -41,19 +41,18 @@
         --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
       }
       [data-theme="dark"] {
-        --bg: #0A0B0E;
-        --window-bg:
-          radial-gradient(1000px 620px at 88% -14%, rgba(10, 132, 255, 0.13) 0%, rgba(10, 132, 255, 0) 55%),
-          radial-gradient(820px 520px at -6% 112%, rgba(125, 122, 255, 0.11) 0%, rgba(125, 122, 255, 0) 60%),
-          linear-gradient(165deg, #121216 0%, #090A0D 55%, #0B0E15 100%);
-        --sidebar-bg: rgba(28, 29, 35, 0.62);
-        --card-bg: #1B1C21;
-        --card-border: rgba(255, 255, 255, 0.08);
-        --card-border-strong: rgba(255, 255, 255, 0.16);
-        --text: #F4F5F7;
-        --text-secondary: #9C9EA8;
-        --text-tertiary: #5D5F68;
-        --separator: rgba(255, 255, 255, 0.11);
+        /* MIUI 风格：纯黑 AMOLED 背景 + 深灰分组卡片，去掉蓝紫渐变
+           --window-bg 用纯色渐变占位，保证 `background: image color` 合法 */
+        --bg: #000000;
+        --window-bg: linear-gradient(#000000, #000000);
+        --sidebar-bg: rgba(24, 24, 26, 0.92);
+        --card-bg: #1C1C1E;
+        --card-border: rgba(255, 255, 255, 0.055);
+        --card-border-strong: rgba(255, 255, 255, 0.12);
+        --text: #FFFFFF;
+        --text-secondary: #98989F;
+        --text-tertiary: #6E6E76;
+        --separator: rgba(255, 255, 255, 0.09);
         --accent: #2E90FF;
         --accent-soft: rgba(10, 132, 255, 0.16);
         --accent-ring: rgba(10, 132, 255, 0.38);
@@ -155,6 +154,64 @@
         font-weight: 500;
         letter-spacing: 0.4px;
         color: var(--text-tertiary);
+      }
+
+      /* ===== 设置搜索框（MIUI 风格） ===== */
+      .settings-search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 4px 14px;
+        padding: 0 12px;
+        height: 36px;
+        border-radius: 18px;
+        background: var(--hover-bg);
+        border: 0.5px solid var(--card-border);
+        color: var(--text-tertiary);
+        transition: background 0.15s var(--ease), border-color 0.15s var(--ease);
+      }
+      .settings-search:focus-within {
+        background: var(--card-bg);
+        border-color: var(--card-border-strong);
+      }
+      .settings-search > svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
+      .settings-search input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        outline: none;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 13px;
+        -webkit-appearance: none;
+        appearance: none;
+      }
+      .settings-search input::placeholder { color: var(--text-tertiary); }
+      .settings-search input::-webkit-search-cancel-button { display: none; }
+      .settings-search-clear {
+        flex-shrink: 0;
+        width: 18px;
+        height: 18px;
+        border: none;
+        border-radius: 50%;
+        background: var(--text-tertiary);
+        color: var(--card-bg);
+        font-size: 13px;
+        line-height: 18px;
+        text-align: center;
+        cursor: pointer;
+        opacity: 0.7;
+      }
+      .settings-search-empty {
+        padding: 22px 20px;
+        text-align: center;
+        color: var(--text-tertiary);
+        font-size: 13px;
       }
 
       .nav {
@@ -1333,10 +1390,20 @@
       }
       .app-icon { display: none; }
       .sidebar-title {
-        font-size: 32px; font-weight: 700; letter-spacing: -0.9px;
+        font-size: 34px; font-weight: 700; letter-spacing: -1px;
         line-height: 1.15; white-space: normal;
       }
       .sidebar-subtitle { font-size: 13px; letter-spacing: 0; color: var(--text-secondary); }
+      /* 竖屏搜索框：贴标题下方，胶囊深灰 */
+      .settings-search {
+        margin: 0 16px 18px;
+        height: 40px;
+        padding: 0 14px;
+        gap: 9px;
+        border-radius: 20px;
+      }
+      .settings-search > svg { width: 18px; height: 18px; }
+      .settings-search input { font-size: 14px; }
       .nav {
         display: block; padding: 0; margin: 0 16px; gap: 0;
         background: var(--card-bg);
@@ -1559,6 +1626,14 @@
             <div class="sidebar-subtitle">NeoWarp</div>
           </div>
         </div>
+
+        <!-- 设置搜索框（MIUI 风格胶囊） -->
+        <div class="settings-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="search" id="settings-search-input" autocomplete="off" spellcheck="false" placeholder="搜索系统设置项" aria-label="搜索系统设置项">
+          <button type="button" class="settings-search-clear" id="settings-search-clear" aria-label="清除" hidden>×</button>
+        </div>
+        <div class="settings-search-empty" id="settings-search-empty" hidden>未找到相关设置项</div>
 
         <nav class="nav">
           <button class="nav-item selected" data-page="updates">
@@ -2191,8 +2266,45 @@
         document.querySelector(`.nav-item[data-page="${id}"] .nav-label`).textContent = label;
         document.querySelector(`.page[data-page="${id}"] .page-title`).textContent = label;
       }
-      document.querySelector('.sidebar-title').textContent = strings['desktop-settings.title'];
+      // 主标题对齐系统设置风格：大标题「设置」，副标题保留 NeoWarp 品牌
+      document.querySelector('.sidebar-title').textContent =
+        (strings['desktop-settings.title'] || '').replace(/桌面\s*/, '') || '设置';
       document.querySelector('.sidebar-footer').textContent = `NeoWarp ${version}`;
+
+      // ===== 设置项搜索过滤（MIUI 风格）=====
+      (function () {
+        const input = document.getElementById('settings-search-input');
+        const clearBtn = document.getElementById('settings-search-clear');
+        const emptyTip = document.getElementById('settings-search-empty');
+        if (!input) return;
+        const allItems = Array.from(document.querySelectorAll('.nav-item'));
+        const allNavs = Array.from(document.querySelectorAll('.nav'));
+        function applyFilter() {
+          const q = input.value.trim().toLocaleLowerCase();
+          clearBtn.hidden = q.length === 0;
+          let visible = 0;
+          allItems.forEach((item) => {
+            const label = (item.querySelector('.nav-label') || {}).textContent || '';
+            const page = item.dataset.page || '';
+            const hit = !q || label.toLocaleLowerCase().indexOf(q) >= 0 || page.indexOf(q) >= 0;
+            item.style.display = hit ? '' : 'none';
+            if (hit) visible++;
+          });
+          // 整组都隐藏时，把该组 nav 也隐藏；否则显示
+          allNavs.forEach((nav) => {
+            const anyVisible = Array.from(nav.querySelectorAll('.nav-item'))
+              .some((it) => it.style.display !== 'none');
+            nav.style.display = anyVisible ? '' : 'none';
+          });
+          emptyTip.hidden = visible > 0;
+        }
+        input.addEventListener('input', applyFilter);
+        clearBtn.addEventListener('click', () => {
+          input.value = '';
+          applyFilter();
+          input.focus();
+        });
+      })();
 
       // ===== Section switching（单页设置：列表 → 二级页 → 返回）=====
       const content = document.getElementById('content');
