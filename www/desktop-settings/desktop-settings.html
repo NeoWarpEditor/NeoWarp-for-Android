@@ -226,6 +226,7 @@
       .nav-item[data-page="language"]     { --tint: #5AC8FA; --tint-soft: rgba(90, 200, 250, 0.14); --tint-text: #0A84FF; }
       .nav-item[data-page="media"]        { --tint: #007AFF; --tint-soft: rgba(0, 122, 255, 0.13);  --tint-text: #007AFF; }
       .nav-item[data-page="performance"]  { --tint: #FF9500; --tint-soft: rgba(255, 149, 0, 0.16);  --tint-text: #C77800; }
+      .nav-item[data-page="storage"]      { --tint: #C86FFF; --tint-soft: rgba(200, 111, 255, 0.14); --tint-text: #A855D6; }
       .nav-item[data-page="privacy"]      { --tint: #FF3B30; --tint-soft: rgba(255, 59, 48, 0.13);  --tint-text: #E0362B; }
       .nav-item[data-page="integrations"] { --tint: #AF52DE; --tint-soft: rgba(175, 82, 222, 0.14); --tint-text: #A028C9; }
       .nav-item[data-page="associations"] { --tint: #00C7BE; --tint-soft: rgba(0, 199, 190, 0.15); --tint-text: #008E8A; }
@@ -237,6 +238,7 @@
       [data-theme="dark"] .nav-item[data-page="language"]     { --tint: #64D2FF; --tint-text: #64D2FF; }
       [data-theme="dark"] .nav-item[data-page="media"]        { --tint: #0A84FF; --tint-text: #0A84FF; }
       [data-theme="dark"] .nav-item[data-page="performance"]  { --tint: #FF9F0A; --tint-text: #FF9F0A; }
+      [data-theme="dark"] .nav-item[data-page="storage"]      { --tint: #C86FFF; --tint-text: #C86FFF; }
       [data-theme="dark"] .nav-item[data-page="privacy"]      { --tint: #FF453A; --tint-text: #FF453A; }
       [data-theme="dark"] .nav-item[data-page="integrations"] { --tint: #BF5AF2; --tint-text: #BF5AF2; }
       [data-theme="dark"] .nav-item[data-page="associations"] { --tint: #66D4CF; --tint-text: #66D4CF; }
@@ -1453,6 +1455,85 @@
         .nav-item, .nav-item .nav-icon, .detail-back,
         body, .card, .detail-nav, .setting-row { transition: none !important; }
       }
+
+      /* ===== 储存空间分析页 ===== */
+      .storage-page { padding-top: 6px; }
+      /* 环形图 */
+      .storage-hero {
+        display: flex; flex-direction: column; align-items: center;
+        padding: 18px 0 20px;
+      }
+      .storage-ring {
+        position: relative; width: 216px; height: 216px;
+        display: grid; place-items: center;
+      }
+      .storage-ring svg {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        transform: rotate(-90deg);
+        filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.18));
+      }
+      .storage-ring .ring-track { fill: none; stroke: rgba(120,120,128,0.16); stroke-width: 20; }
+      .storage-ring .ring-seg {
+        fill: none; stroke-width: 20; stroke-linecap: round;
+        transition: stroke-dasharray .7s var(--ease), stroke-dashoffset .7s var(--ease);
+      }
+      .storage-ring .ring-app { stroke: url(#nwRingApp); }
+      .storage-ring .ring-phone { stroke: #2E90FF; }
+      .ring-center { position: relative; text-align: center; z-index: 1; }
+      .ring-value { font-size: 34px; font-weight: 700; letter-spacing: -1px; line-height: 1.1; }
+      .ring-unit { font-size: 17px; font-weight: 600; margin-left: 2px; }
+      .ring-label { margin-top: 6px; font-size: 12.5px; color: var(--text-secondary); }
+      /* 图例 */
+      .storage-legend {
+        display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px;
+        margin-top: 22px; padding: 0 8px;
+      }
+      .legend-item { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--text-secondary); }
+      .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+      .legend-dot.app { background: linear-gradient(135deg, #5AC8FA, #C86FFF); }
+      .legend-dot.phone { background: #2E90FF; }
+      .legend-dot.free { background: rgba(120,120,128,0.35); }
+      /* 分类卡片 */
+      .storage-card {
+        display: flex; align-items: center; gap: 14px;
+        padding: 16px; margin-bottom: 14px;
+        background: var(--card-bg);
+        border: 0.5px solid var(--card-border);
+        border-radius: 14px; box-shadow: var(--shadow);
+        transition: background .16s var(--ease), transform .18s var(--ease);
+      }
+      .storage-card:active { transform: scale(.99); }
+      .storage-card-icon {
+        width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+        display: grid; place-items: center; color: #fff;
+      }
+      .storage-card-icon svg { width: 22px; height: 22px; }
+      .storage-card-icon.projects { background: linear-gradient(135deg, #34C759, #30D158); }
+      .storage-card-icon.cache { background: linear-gradient(135deg, #5AC8FA, #0A84FF); }
+      .storage-card-icon.other { background: linear-gradient(135deg, #FF9F0A, #FF9500); }
+      .storage-card-body { flex: 1; min-width: 0; }
+      .storage-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+      .storage-card-size { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; margin: 3px 0 4px; }
+      .storage-card-size .u { font-size: 14px; font-weight: 600; margin-left: 2px; }
+      .storage-card-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.45; }
+      .storage-card-action {
+        flex-shrink: 0; min-width: 60px; height: 34px; padding: 0 14px;
+        border: none; border-radius: 17px; cursor: pointer;
+        font-size: 13px; font-weight: 600; color: var(--text);
+        background: var(--active-bg);
+        -webkit-tap-highlight-color: transparent;
+        transition: transform .14s var(--ease), opacity .14s var(--ease), background .14s var(--ease);
+      }
+      .storage-card-action.primary {
+        color: #fff; background: linear-gradient(135deg, #32ADE6, #0A84FF);
+        box-shadow: 0 4px 12px -4px rgba(10,132,255,0.5);
+      }
+      .storage-card-action:active { transform: scale(.94); opacity: .85; }
+      .storage-card-action:disabled { opacity: .5; cursor: default; }
+      .storage-note { font-size: 11.5px; color: var(--text-tertiary); text-align: center; padding: 6px 12px 2px; }
+      @media (prefers-reduced-motion: reduce) {
+        .storage-ring .ring-seg, .storage-card, .storage-card-action { transition: none !important; }
+      }
     </style>
   </head>
   <body>
@@ -1511,6 +1592,12 @@
           </button>
         </nav>
         <nav class="nav">
+          <button class="nav-item" data-page="storage">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12v7"></path></svg>
+            </span>
+            <span class="nav-label"></span>
+          </button>
           <button class="nav-item" data-page="privacy">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -1869,6 +1956,73 @@
           <div class="alert alert-warning background-throttling-warning"></div>
         </section>
 
+        <!-- Storage -->
+        <section class="page storage-page" data-page="storage">
+          <h1 class="page-title"></h1>
+          <div class="storage-hero">
+            <div class="storage-ring">
+              <svg viewBox="0 0 200 200" aria-hidden="true">
+                <defs>
+                  <linearGradient id="nwRingApp" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#5AC8FA"></stop>
+                    <stop offset="100%" stop-color="#C86FFF"></stop>
+                  </linearGradient>
+                </defs>
+                <circle class="ring-track" cx="100" cy="100" r="80"></circle>
+                <circle class="ring-seg ring-phone" id="ringPhone" cx="100" cy="100" r="80" stroke-dasharray="0 999" stroke-dashoffset="0"></circle>
+                <circle class="ring-seg ring-app" id="ringApp" cx="100" cy="100" r="80" stroke-dasharray="0 999" stroke-dashoffset="0"></circle>
+              </svg>
+              <div class="ring-center">
+                <div class="ring-value"><span id="storageTotal">--</span><span class="ring-unit">GB</span></div>
+                <div class="ring-label" id="storageCenterLabel"></div>
+              </div>
+            </div>
+            <div class="storage-legend">
+              <span class="legend-item"><i class="legend-dot app"></i><span id="legendApp"></span></span>
+              <span class="legend-item"><i class="legend-dot phone"></i><span id="legendPhone"></span></span>
+              <span class="legend-item"><i class="legend-dot free"></i><span id="legendFree"></span></span>
+            </div>
+          </div>
+
+          <div class="storage-card">
+            <div class="storage-card-icon projects">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+            </div>
+            <div class="storage-card-body">
+              <div class="storage-card-title" id="storageProjectsTitle"></div>
+              <div class="storage-card-size"><span id="storageProjects">--</span><span class="u">GB</span></div>
+              <div class="storage-card-desc" id="storageProjectsDesc"></div>
+            </div>
+            <button class="storage-card-action" id="storageManageBtn"></button>
+          </div>
+
+          <div class="storage-card">
+            <div class="storage-card-icon cache">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"></path><polyline points="21 3 21 9 15 9"></polyline></svg>
+            </div>
+            <div class="storage-card-body">
+              <div class="storage-card-title" id="storageCacheTitle"></div>
+              <div class="storage-card-size"><span id="storageCache">--</span><span class="u">MB</span></div>
+              <div class="storage-card-desc" id="storageCacheDesc"></div>
+            </div>
+            <button class="storage-card-action primary" id="storageCleanBtn"></button>
+          </div>
+
+          <div class="storage-card">
+            <div class="storage-card-icon other">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><line x1="3" y1="10" x2="21" y2="10"></line><line x1="8" y1="4" x2="8" y2="10"></line></svg>
+            </div>
+            <div class="storage-card-body">
+              <div class="storage-card-title" id="storageOtherTitle"></div>
+              <div class="storage-card-size"><span id="storageOther">--</span><span class="u">GB</span></div>
+              <div class="storage-card-desc" id="storageOtherDesc"></div>
+            </div>
+            <button class="storage-card-action" id="storageViewBtn"></button>
+          </div>
+
+          <div class="storage-note" id="storageNote"></div>
+        </section>
+
         <!-- Privacy & Security -->
         <section class="page" data-page="privacy">
           <h1 class="page-title"></h1>
@@ -2013,6 +2167,7 @@
         language: 'desktop-settings.section-language',
         media: 'desktop-settings.section-media',
         performance: 'desktop-settings.section-performance',
+        storage: 'desktop-settings.section-storage',
         privacy: 'desktop-settings.section-privacy',
         integrations: 'desktop-settings.section-integrations',
         associations: 'desktop-settings.section-associations',
@@ -2042,6 +2197,7 @@
         detailTitle.textContent = item.querySelector('.nav-label').textContent;
         document.body.classList.add('nw-detail');
         content.scrollTop = 0;
+        if (id === 'storage' && typeof loadStorage === 'function') loadStorage();
       }
       navItems.forEach((item) => {
         item.addEventListener('click', () => enterDetail(item));
@@ -2051,6 +2207,122 @@
         navItems.forEach((i) => i.classList.remove('selected'));
         pages.forEach((p) => p.classList.remove('active'));
       });
+
+      // ===== Storage 储存空间分析 =====
+      (function initStorage () {
+        const S = (k, fallback) => strings[k] || fallback;
+        // 文案
+        document.getElementById('storageCenterLabel').textContent = S('desktop-settings.storage-center', '占用手机存储空间');
+        document.getElementById('legendApp').textContent = S('desktop-settings.storage-app-used', 'NeoWarp 已用空间');
+        document.getElementById('legendPhone').textContent = S('desktop-settings.storage-phone-used', '手机已用空间');
+        document.getElementById('legendFree').textContent = S('desktop-settings.storage-phone-free', '手机可用空间');
+        document.getElementById('storageProjectsTitle').textContent = S('desktop-settings.storage-projects', '项目与文件');
+        document.getElementById('storageProjectsDesc').textContent = S('desktop-settings.storage-projects-desc', '已保存的项目、角色、背景与下载的资源。');
+        document.getElementById('storageCacheTitle').textContent = S('desktop-settings.storage-cache', '缓存数据');
+        document.getElementById('storageCacheDesc').textContent = S('desktop-settings.storage-cache-desc', 'NeoWarp 产生的临时数据，清理不影响正常使用。');
+        document.getElementById('storageOtherTitle').textContent = S('desktop-settings.storage-other', '其他数据');
+        document.getElementById('storageOtherDesc').textContent = S('desktop-settings.storage-other-desc', '应用文件、设置及其他数据，清理需卸载重装应用。');
+        document.getElementById('storageNote').textContent = S('desktop-settings.storage-desc', '管理 NeoWarp 在此设备上占用的空间。');
+        document.getElementById('storageManageBtn').textContent = S('desktop-settings.storage-manage', '管理');
+        document.getElementById('storageCleanBtn').textContent = S('desktop-settings.storage-clean', '清理');
+        document.getElementById('storageViewBtn').textContent = S('desktop-settings.storage-view', '查看');
+
+        const C = 2 * Math.PI * 80; // 环周长 ≈ 502.65
+        const ringApp = document.getElementById('ringApp');
+        const ringPhone = document.getElementById('ringPhone');
+
+        function fmt (bytes) {
+          if (!isFinite(bytes) || bytes < 0) bytes = 0;
+          const gb = bytes / (1024 * 1024 * 1024);
+          const mb = bytes / (1024 * 1024);
+          if (gb >= 1) return { value: (Math.round(gb * 10) / 10).toString(), unit: 'GB' };
+          if (mb >= 1) return { value: (Math.round(mb * 10) / 10).toString(), unit: 'MB' };
+          return { value: (Math.round(bytes / 1024)).toString(), unit: 'KB' };
+        }
+        function setSize (id, bytes) {
+          const el = document.getElementById(id);
+          const f = fmt(bytes);
+          el.textContent = f.value;
+          const u = el.nextElementSibling;
+          if (u && u.classList.contains('u')) u.textContent = f.unit;
+        }
+        function drawRing (appUsed, phoneUsed, free) {
+          const total = appUsed + phoneUsed + free;
+          const appLen = total > 0 ? (appUsed / total) * C : 0;
+          const phoneLen = total > 0 ? (phoneUsed / total) * C : 0;
+          // 段间留 2px 间隙（首尾圆角），彩色段从 12 点顺时针排布
+          const gap = Math.min(2, (appLen + phoneLen) / 4);
+          ringApp.setAttribute('stroke-dasharray', Math.max(0, appLen - gap) + ' ' + (C - appLen + gap));
+          ringApp.setAttribute('stroke-dashoffset', '0');
+          ringPhone.setAttribute('stroke-dasharray', Math.max(0, phoneLen - gap) + ' ' + (C - phoneLen + gap));
+          ringPhone.setAttribute('stroke-dashoffset', -appLen);
+        }
+
+        window.loadStorage = async function () {
+          const loading = S('desktop-settings.storage-loading', '正在计算...');
+          ['storageTotal','storageProjects','storageCache','storageOther'].forEach(id => document.getElementById(id).textContent = '··');
+          document.getElementById('storageCenterLabel').textContent = loading;
+          let info = null;
+          try {
+            if (window.DesktopSettingsPreload && DesktopSettingsPreload.getStorageInfo) {
+              info = await DesktopSettingsPreload.getStorageInfo();
+            }
+          } catch (e) { info = null; }
+          if (!info || info.__nwError) {
+            document.getElementById('storageCenterLabel').textContent = S('desktop-settings.error', '错误').replace('{error}', 'storage');
+            return;
+          }
+          const appUsed = info.appUsed || 0;
+          const total = info.total || 0;
+          const available = info.available || 0;
+          const phoneUsed = Math.max(0, total - available - appUsed);
+          const free = available;
+          // 中心：NeoWarp 占用量（GB/自动单位），副标题为占手机百分比
+          const f = fmt(appUsed);
+          document.getElementById('storageTotal').textContent = f.value;
+          document.querySelector('#storageTotal + .ring-unit').textContent = f.unit;
+          const pct = total > 0 ? ((appUsed / total) * 100).toFixed(1) : '0';
+          document.getElementById('storageCenterLabel').textContent = pct + '% · ' + S('desktop-settings.storage-center', '占用手机存储空间');
+          setSize('storageProjects', info.projects || 0);
+          setSize('storageCache', info.cache || 0);
+          setSize('storageOther', info.other || 0);
+          drawRing(appUsed, phoneUsed, free);
+        };
+
+        // 清理缓存
+        const cleanBtn = document.getElementById('storageCleanBtn');
+        cleanBtn.addEventListener('click', async () => {
+          if (cleanBtn.disabled) return;
+          const cleanLabel = S('desktop-settings.storage-clean', '清理');
+          const cleaning = S('desktop-settings.storage-cleaning', '清理中...');
+          cleanBtn.disabled = true;
+          cleanBtn.textContent = cleaning;
+          try {
+            let res = null;
+            if (window.DesktopSettingsPreload && DesktopSettingsPreload.clearCache) {
+              res = await DesktopSettingsPreload.clearCache();
+            }
+            const freed = (res && res.freed) || 0;
+            const doneTpl = S('desktop-settings.storage-clean-done', '已释放 {size}');
+            const fs = fmt(freed);
+            cleanBtn.textContent = doneTpl.replace('{size}', fs.value + fs.unit);
+            await window.loadStorage();
+          } catch (e) {
+            cleanBtn.textContent = S('desktop-settings.error', '错误').replace('{error}', 'cache');
+          }
+          setTimeout(() => {
+            cleanBtn.disabled = false;
+            cleanBtn.textContent = cleanLabel;
+          }, 1600);
+        });
+
+        // 管理 / 查看：打开用户数据目录（原生支持时）
+        const openData = () => {
+          try { if (window.DesktopSettingsPreload) DesktopSettingsPreload.openUserData(); } catch (e) {}
+        };
+        document.getElementById('storageManageBtn').addEventListener('click', openData);
+        document.getElementById('storageViewBtn').addEventListener('click', openData);
+      })();
 
       // ===== Check for updates =====
       const checkForUpdatesBtn = document.querySelector('.check-for-updates-btn');

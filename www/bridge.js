@@ -2417,7 +2417,9 @@
       saveAiModelConfigs: function (payload) { return inv('saveAiModelConfigs', { payload: payload }); },
       onAiModelConfigsChanged: function (callback) { on('settings', 'ai-model-configs-changed', callback); },
       getTheme: function () { return inv('getTheme'); },
-      onThemeChanged: function (callback) { on('desktop-settings', 'theme-changed', callback); }
+      onThemeChanged: function (callback) { on('desktop-settings', 'theme-changed', callback); },
+      getStorageInfo: function () { return inv('getStorageInfo'); },
+      clearCache: function () { return inv('clearCache'); }
     };
   }
 

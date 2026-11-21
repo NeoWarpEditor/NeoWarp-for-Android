@@ -669,6 +669,8 @@ public class BridgeHub {
             /* ---------- 统计 ---------- */
             case "getSystemStats": reply(cbId, systemStats().toString()); return;
             case "getAISystemInfo": reply(cbId, aiSystemInfo().toString()); return;
+            case "getStorageInfo": reply(cbId, storageInfo().toString()); return;
+            case "clearCache": reply(cbId, clearAppCache().toString()); return;
             case "getPreferredMediaDevices": {
                 JSONObject o = new JSONObject();
                 o.put("microphone", settingsOpt("microphone"));
@@ -2222,6 +2224,109 @@ public class BridgeHub {
     /* ============================================================
      * 系统统计
      * ============================================================ */
+
+    /** 递归统计目录字节数（跟随普通文件，符号链接不追踪，避免循环） */
+    private static long dirSize(java.io.File dir) {
+        long size = 0;
+        if (dir == null || !dir.exists()) return 0;
+        java.io.File[] files = dir.listFiles();
+        if (files == null) return 0;
+        for (java.io.File f : files) {
+            try {
+                if (f.isDirectory() && !isSymbolicLink(f)) size += dirSize(f);
+                else if (f.isFile()) size += f.length();
+            } catch (Exception ignored) {
+            }
+        }
+        return size;
+    }
+
+    private static boolean isSymbolicLink(java.io.File f) {
+        try {
+            return java.nio.file.Files.isSymbolicLink(f.toPath());
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 储存空间分析：项目文件 / 缓存 / 其他 + 系统总空间与可用空间（字节）。
+     * 口径：应用私有目录 dataDir 下，cache=cacheDir，projects=filesDir 内的 ProjectData/项目，
+     * 其余归入 other；系统空间取内部存储 StatFs。
+     */
+    private JSONObject storageInfo() {
+        JSONObject o = new JSONObject();
+        try {
+            long cache = dirSize(app.getCacheDir());
+            long filesTotal = dirSize(app.getFilesDir());
+            // filesDir 下常见的项目/素材目录归为「项目文件」，其余归「其他数据」
+            long projects = 0;
+            String[] projectDirs = {"ProjectData", "projects", "Projects", "sb3", "sprites", "backdrops", "sounds"};
+            for (String name : projectDirs) {
+                java.io.File d = new java.io.File(app.getFilesDir(), name);
+                if (d.exists()) projects += dirSize(d);
+            }
+            if (projects > filesTotal) projects = filesTotal;
+            long other = Math.max(0, filesTotal - projects);
+
+            // 外部私有目录（部分数据/下载落在这里），计入「其他数据」
+            java.io.File ext = app.getExternalFilesDir(null);
+            long external = dirSize(ext);
+            other += external;
+
+            long total = 0, available = 0;
+            try {
+                android.os.StatFs stat = new android.os.StatFs(android.os.Environment.getDataDirectory().getPath());
+                if (android.os.Build.VERSION.SDK_INT >= 18) {
+                    total = stat.getTotalBytes();
+                    available = stat.getAvailableBytes();
+                } else {
+                    total = (long) stat.getBlockCount() * stat.getBlockSize();
+                    available = (long) stat.getAvailableBlocks() * stat.getBlockSize();
+                }
+            } catch (Exception ignored) {
+            }
+
+            o.put("cache", cache);
+            o.put("projects", projects);
+            o.put("other", other);
+            o.put("appUsed", cache + projects + other);
+            o.put("total", total);
+            o.put("available", available);
+        } catch (Exception e) {
+            try { o.put("error", String.valueOf(e)); } catch (Exception ignored) {}
+        }
+        return o;
+    }
+
+    /** 清理应用缓存目录内容，返回清理掉的字节数 */
+    private JSONObject clearAppCache() {
+        JSONObject o = new JSONObject();
+        long freed = 0;
+        try {
+            java.io.File cache = app.getCacheDir();
+            freed = dirSize(cache);
+            deleteContents(cache);
+            o.put("freed", freed);
+            o.put("ok", true);
+        } catch (Exception e) {
+            try { o.put("ok", false).put("error", String.valueOf(e)); } catch (Exception ignored) {}
+        }
+        return o;
+    }
+
+    private static void deleteContents(java.io.File dir) {
+        if (dir == null || !dir.exists()) return;
+        java.io.File[] files = dir.listFiles();
+        if (files == null) return;
+        for (java.io.File f : files) {
+            try {
+                if (f.isDirectory() && !isSymbolicLink(f)) { deleteContents(f); f.delete(); }
+                else f.delete();
+            } catch (Exception ignored) {
+            }
+        }
+    }
 
     private JSONObject systemStats() {
         JSONObject o = new JSONObject();
