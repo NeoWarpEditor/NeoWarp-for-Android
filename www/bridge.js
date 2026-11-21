@@ -2086,6 +2086,13 @@
       return inv('getFileInfo', { id: id }).then(function (info) {
         if (!info) throw new Error('File not found');
         if (info.error) return info;
+        // 记录本次打开的「纯文件名」（去扩展名），供全屏加载页显示标题。
+        // 必须在 loadProject 之前就绪，所以放在这里而非 projectTitle reducer。
+        try {
+          var nm = String(info.name || '');
+          var m = nm.match(/^(.*)\.(?:sb[23]?|np1|npnp|viewsb3)$/i);
+          window.__nwLoadingFileName = (m ? m[1] : nm).substring(0, 100);
+        } catch (e) {}
         return readFileBytes(info.id).then(function (buf) {
           return { name: info.name, type: info.type, data: new Uint8Array(buf), isViewOnly: !!info.isViewOnly };
         });
