@@ -36,6 +36,16 @@
 
   window.__NW_WINDOW_TYPE = WIN_TYPE;
 
+  /* 保存原生弹窗引用：GUI bundle 加载时会执行
+       window.confirm = message => PromptsPreload.confirm(message)
+       window.alert   = message => PromptsPreload.alert(message)
+     若 PromptsPreload.confirm 再调用 window.confirm，就会形成无限递归
+     （Maximum call stack size exceeded），导致"新作品"点击后卡死不动。
+     这里在 bundle 覆盖之前留存原生引用，供 PromptsPreload 使用。 */
+  var NATIVE_ALERT = window.alert.bind(window);
+  var NATIVE_CONFIRM = window.confirm.bind(window);
+  var NATIVE_PROMPT = window.prompt.bind(window);
+
   /* 统一视口：显式声明 device-width。缺失时部分内核会用更宽的默认布局视口，
      导致 fixed 定位的元素（查找框/扩展/添加按钮等）相对错误的原点定位。 */
   (function () {
@@ -1927,8 +1937,11 @@
    * 4. PromptsPreload（编辑器/打包器共用）
    * ============================================================ */
   window.PromptsPreload = {
-    alert: function (message) { window.alert(message); },
-    confirm: function (message) { return window.confirm(message); }
+    // 必须用 bundle 覆盖前保存的原生引用，不能调用 window.alert/window.confirm
+    // ——bundle 会把它们重定向回这里，形成无限递归导致新作品点击卡死。
+    alert: function (message) { NATIVE_ALERT(message); },
+    confirm: function (message) { return NATIVE_CONFIRM(message); },
+    prompt: function (message, defaultValue) { return NATIVE_PROMPT(message, defaultValue); }
   };
 
   /* ============================================================
@@ -2123,8 +2136,9 @@
       return true;
     },
     openNewWindow: function () {
-      // 永远在当前页面新建项目，不再开新窗口（与当前项目相互独立）。
-      return this.newProject();
+      // 新窗口 = 新建独立的 Android Activity（与当前项目相互独立）。
+      // Java 侧 BridgeHub 收到后调用 WindowActivity.showNew() 起新窗口。
+      return inv('openNewWindow', { type: 'editor' });
     },
     openAddonSettings: function (search) { return inv('openWindow', { type: 'addons', search: search || '' }); },
     openPackager: function () { return inv('openWindow', { type: 'packager' }); },
