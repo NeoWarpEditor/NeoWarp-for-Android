@@ -2815,13 +2815,62 @@ public class BridgeHub {
 
     /** Java 网络代理（免 CORS，对应 Electron 主进程 fetch / tw-ai-proxy） */
     public WebResourceResponse proxyFetch(String urlStr) {
+        HttpURLConnection conn = null;
         try {
             if (urlStr == null || urlStr.isEmpty()) return errorResponse(400, "missing u");
-            HttpURLConnection conn = (HttpURLConnection) new URL(urlStr).openConnection();
+
+            String target = urlStr;
+            String method = "GET";
+            Map<String, String> reqHeaders = new HashMap<>();
+            String reqBody = null;
+
+            // /__fetch/?u=<target>&m=<method>&h=<base64(headers)>&b=<base64(body)>
+            // 仅本机代理 URL 解析这些参数；Scratch CDN 素材代理走纯 GET（下方 else）
+            Uri parsed = Uri.parse(urlStr);
+            if ("localhost".equals(parsed.getHost()) && parsed.getPath() != null
+                    && parsed.getPath().startsWith("/__fetch/")) {
+                String u = parsed.getQueryParameter("u");
+                if (u == null || u.isEmpty()) return errorResponse(400, "missing u");
+                target = u;
+                String m = parsed.getQueryParameter("m");
+                if (m != null && !m.isEmpty()) method = m.toUpperCase(java.util.Locale.ROOT);
+                String h = parsed.getQueryParameter("h");
+                if (h != null && !h.isEmpty()) {
+                    try {
+                        String json = new String(Base64.decode(h, Base64.DEFAULT), StandardCharsets.UTF_8);
+                        JSONObject jo = new JSONObject(json);
+                        Iterator<String> it = jo.keys();
+                        while (it.hasNext()) {
+                            String k = it.next();
+                            reqHeaders.put(k, jo.optString(k));
+                        }
+                    } catch (Exception ignore) { }
+                }
+                String b = parsed.getQueryParameter("b");
+                if (b != null && !b.isEmpty()) {
+                    try {
+                        reqBody = new String(Base64.decode(b, Base64.DEFAULT), StandardCharsets.UTF_8);
+                    } catch (Exception ignore) { }
+                }
+            }
+
+            conn = (HttpURLConnection) new URL(target).openConnection();
             conn.setConnectTimeout(15000);
-            conn.setReadTimeout(30000);
+            // AI 对话是 SSE 长流，读超时放宽；流式响应由 InputStream 直接透传给 WebView
+            conn.setReadTimeout(120000);
             conn.setInstanceFollowRedirects(true);
+            conn.setRequestMethod(method);
             conn.setRequestProperty("User-Agent", "NeoWarp/0.0.1 (Android)");
+            for (Map.Entry<String, String> e : reqHeaders.entrySet()) {
+                conn.setRequestProperty(e.getKey(), e.getValue());
+            }
+            if (reqBody != null && !"GET".equals(method) && !"HEAD".equals(method)) {
+                conn.setDoOutput(true);
+                byte[] out = reqBody.getBytes(StandardCharsets.UTF_8);
+                OutputStream os = conn.getOutputStream();
+                try { os.write(out); os.flush(); } finally { os.close(); }
+            }
+
             int code = conn.getResponseCode();
             String mime = conn.getContentType();
             String charset = null;
@@ -2834,15 +2883,32 @@ public class BridgeHub {
                 }
             }
             InputStream body = code >= 400 ? conn.getErrorStream() : conn.getInputStream();
-            if (body == null) body = new ByteArrayInputStream(new byte[0]);
+            final InputStream finalBody = body == null ? new ByteArrayInputStream(new byte[0]) : body;
             WebResourceResponse resp = new WebResourceResponse(
-                    mime == null ? "application/octet-stream" : mime, charset, body);
+                    mime == null ? "application/octet-stream" : mime, charset, finalBody);
+            // 透传响应头（跳过长度/编码类，避免与 WebView 流式解析冲突）
             Map<String, String> headers = new HashMap<>();
+            String skip[] = {"content-length", "transfer-encoding", "content-encoding",
+                             "content-type", "access-control-allow-origin", "access-control-allow-headers"};
+            for (Map.Entry<String, List<String>> e : conn.getHeaderFields().entrySet()) {
+                if (e.getKey() == null) continue;
+                boolean skipIt = false;
+                for (String s : skip) if (s.equalsIgnoreCase(e.getKey())) { skipIt = true; break; }
+                if (skipIt) continue;
+                StringBuilder sb = new StringBuilder();
+                for (String v : e.getValue()) { if (sb.length() > 0) sb.append(", "); sb.append(v); }
+                headers.put(e.getKey(), sb.toString());
+            }
             headers.put("Access-Control-Allow-Origin", "*");
             headers.put("Access-Control-Allow-Headers", "*");
             resp.setResponseHeaders(headers);
+            // 反映真实状态码，让前端 resp.ok / resp.status 判断正确
+            String reason = conn.getResponseMessage();
+            try { resp.setStatusCodeAndReasonPhrase(code, reason == null ? "" : reason); } catch (Exception ignore) { }
+            // 交由 WebView 关闭 connection 时再断开；这里不立即 disconnect，否则会截断流
             return resp;
         } catch (Exception e) {
+            if (conn != null) conn.disconnect();
             return errorResponse(502, "proxy: " + e);
         }
     }

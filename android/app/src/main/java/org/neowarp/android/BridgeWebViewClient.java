@@ -50,8 +50,8 @@ public class BridgeWebViewClient extends WebViewClient {
                     return hub.serveFileHandle(handleId);
                 }
                 if (path != null && path.startsWith("/__fetch/")) {
-                    String u = url.getQueryParameter("u");
-                    return hub.proxyFetch(u);
+                    // 传完整 URL，proxyFetch 会解析 u/m/h/b（method/headers/body）
+                    return hub.proxyFetch(url.toString());
                 }
                 return hub.serveAsset("www" + (path == null ? "/" : path));
             }

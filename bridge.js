@@ -266,13 +266,61 @@
    *    （WebView 不支持自定义 scheme 的 fetch，映射到 Java 代理）
    * ============================================================ */
   var _origFetch = window.fetch.bind(window);
+  // 把 init.headers 规范成普通对象（Headers / Map / 数组 / 普通对象都支持）
+  function _nwHeadersToObject(h) {
+    var o = {};
+    if (!h) return o;
+    try {
+      if (typeof h.forEach === 'function') {
+        h.forEach(function (v, k) { o[k] = v; });
+      } else if (Array.isArray(h)) {
+        for (var i = 0; i < h.length; i++) o[h[i][0]] = h[i][1];
+      } else {
+        for (var k in h) if (Object.prototype.hasOwnProperty.call(h, k)) o[k] = h[k];
+      }
+    } catch (e) {}
+    return o;
+  }
   window.fetch = function (input, init) {
     try {
       var url = typeof input === 'string' ? input : (input && input.url) || '';
       if (url.indexOf('tw-ai-proxy://') === 0) {
-        var m = url.match(/[?&]u=([^&]+)/);
-        var u = m ? m[1] : '';
-        return _origFetch('/__fetch/?u=' + u, init);
+        // 新版 buildAiProxyUrl: ?u=<endpoint>&k=<token>&h=<base64(headers)>
+        // WebView 的 shouldInterceptRequest 拿不到 POST body 和 headers，
+        // 因此把 method / headers / body 全部编码进 URL query，交给 Java 代理还原。
+        function qp(name) {
+          var m = url.match(new RegExp('[?&]' + name + '=([^&]*)'));
+          return m ? m[1] : null;
+        }
+        var u = qp('u') || '';
+        var method = (init && init.method) || 'GET';
+        // headers 优先取 init.headers（含真实 Authorization），其次 URL 里的 h=
+        var headers = _nwHeadersToObject(init && init.headers);
+        if (!Object.keys(headers).length && qp('h')) {
+          try { headers = JSON.parse(decodeURIComponent(escape(atob(qp('h'))))); }
+          catch (e) { headers = {}; }
+        }
+        // body 可能是 string / ArrayBuffer / Uint8Array，统一转字符串（AI 请求都是 JSON 文本）
+        var body = (init && init.body) || '';
+        if (body && typeof body !== 'string') {
+          try { body = new TextDecoder().decode(body instanceof ArrayBuffer ? body : new Uint8Array(body)); }
+          catch (e) { body = String(body); }
+        }
+        var proxy = '/__fetch/?u=' + u + '&m=' + encodeURIComponent(method);
+        if (Object.keys(headers).length) {
+          proxy += '&h=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(headers)))));
+        }
+        if (body) {
+          proxy += '&b=' + encodeURIComponent(btoa(unescape(encodeURIComponent(String(body)))));
+        }
+        // 保留 signal（AbortController），其余 init 选项透传
+        var nextInit = {};
+        if (init) {
+          if (init.signal) nextInit.signal = init.signal;
+          if (init.cache) nextInit.cache = init.cache;
+          if (init.credentials) nextInit.credentials = init.credentials;
+        }
+        return _origFetch(proxy, nextInit);
       }
       if (url.indexOf('nw-expands://') === 0) {
         var rest = url.replace(/^nw-expands:\/\/[^/]+\//, '');
