@@ -64,6 +64,9 @@
             --lg-border: rgba(0, 0, 0, 0.08);
             --lg-shadow: 0 8px 28px rgba(0, 0, 0, 0.1), 0 2px 8px rgba(0, 0, 0, 0.05);
             --lg-fallback: rgba(255, 255, 255, 0.93);
+            /* 用量明细浮层：毛玻璃底色，比常规玻璃更实一点，小字号才压得住背景文字 */
+            --tip-glass-bg: rgba(255, 255, 255, 0.8);
+            --tip-glass-fallback: rgba(255, 255, 255, 0.96);
             /* 悬浮层尺寸，chat-area 靠它算出让位的内距 */
             --float-gap: 12px;
             --float-bar-h: 50px;
@@ -108,6 +111,8 @@
             --lg-border: rgba(120, 120, 128, 0.22);
             --lg-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
             --lg-fallback: rgba(28, 28, 30, 0.95);
+            --tip-glass-bg: rgba(28, 28, 30, 0.8);
+            --tip-glass-fallback: rgba(28, 28, 30, 0.96);
         }
 
         * {
@@ -1505,8 +1510,9 @@
             padding: 5px 4px 0 6px;
             flex-shrink: 0;
         }
-        /* 脚注自己已经排好版，用量文本不再需要单独的内距 */
-        .msg-footer .msg-context-usage { padding: 0; }
+        /* 脚注自己已经排好版，用量文本不再需要单独的内距；
+           这里要压过 .message-wrapper.ai 的那条，否则本轮用量会跟着下移几像素 */
+        .message-wrapper.ai .msg-footer .msg-context-usage { padding: 0; }
         .undo-ai-btn {
             display: inline-flex;
             align-items: center;
@@ -1570,6 +1576,122 @@
             opacity: 0.45;
             flex-shrink: 0;
         }
+
+        /* ── 本轮用量 + 用时：跟在上下文用量右侧的脚注信息 ── */
+        .msg-turn-usage {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: -2px;
+            padding: 1px 6px;
+            border-radius: var(--radius-full);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            cursor: default;
+            transition: color var(--transition), background var(--transition);
+        }
+        .msg-turn-usage svg { width: 11px; height: 11px; flex-shrink: 0; opacity: 0.75; }
+        .msg-turn-usage:hover { color: var(--text-secondary); background: var(--surface-secondary); }
+        .msg-turn-time {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        /* 挂了速度小窗的用时：hover 提示可交互，与用量胶囊一致 */
+        .msg-turn-time.has-speed-tip {
+            cursor: default;
+            transition: color var(--transition);
+        }
+        .msg-turn-time.has-speed-tip:hover { color: var(--text-secondary); }
+
+        /* 明细浮层：挂 body + fixed 定位，避免被聊天区的滚动容器裁掉 */
+        .turn-usage-tip {
+            position: fixed;
+            z-index: 9000;
+            width: 290px;
+            padding: 12px 14px 11px;
+            border: 0.5px solid var(--lg-border);
+            border-radius: var(--radius);
+            /* 毛玻璃：半透明底色 + 背景模糊，浮起感交给阴影 */
+            background: var(--tip-glass-bg);
+            -webkit-backdrop-filter: saturate(180%) blur(var(--glass-blur));
+            backdrop-filter: saturate(180%) blur(var(--glass-blur));
+            box-shadow: var(--shadow-lg);
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 11.5px;
+            line-height: 1.5;
+            font-variant-numeric: tabular-nums;
+            pointer-events: none;
+            opacity: 0;
+            transform: translateY(4px);
+            transition: opacity 0.14s ease, transform 0.14s ease;
+        }
+        .turn-usage-tip.show { opacity: 1; transform: translateY(0); }
+        /* 不支持背景模糊时改用近实色底色，避免小字号叠在聊天文字上 */
+        @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+            .turn-usage-tip { background: var(--tip-glass-fallback); }
+        }
+        .tu-head {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .tu-total i { font-style: normal; font-weight: 600; color: var(--text-tertiary); margin-right: 4px; }
+        .tu-total b { font-weight: 700; }
+        .tu-row {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 1px 0;
+        }
+        .tu-row.is-sub { padding-left: 15px; }
+        .tu-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 2.5px;
+            flex-shrink: 0;
+        }
+        .tu-row.is-sub .tu-dot { width: 7px; height: 7px; }
+        .tu-label { flex: 1; min-width: 0; }
+        .tu-val { font-weight: 600; color: var(--text); }
+        .tu-row.is-sub .tu-val { font-weight: 600; }
+        .tu-sep { height: 1px; background: var(--border); margin: 9px 0 8px; }
+        .tu-rate {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text);
+            font-weight: 600;
+        }
+        .tu-rate svg { width: 12px; height: 12px; flex-shrink: 0; color: #f5a524; }
+        .tu-rate .tu-val { margin-left: auto; color: #10b981; }
+        .tu-bar {
+            display: flex;
+            height: 6px;
+            margin-top: 7px;
+            border-radius: 3px;
+            overflow: hidden;
+            background: var(--surface-tertiary);
+        }
+        .tu-bar i { display: block; height: 100%; }
+        .tu-legend {
+            display: flex;
+            gap: 12px;
+            margin-top: 7px;
+            font-size: 10.5px;
+            color: var(--text-tertiary);
+        }
+        .tu-legend span { display: inline-flex; align-items: center; gap: 4px; }
+        .tu-legend i { display: block; width: 7px; height: 7px; border-radius: 2px; }
 
         /* ── 回合过程分组：任务完成后折叠，只留最终总结 ── */
         .process-group {
@@ -2754,12 +2876,19 @@
         }
 
         /* ── 设置页：左侧目录 + 右侧内容 ──
-           整页覆盖聊天区。左栏是分类导航并吸附在视口，右栏独立滚动，
-           这样切分类时不会把长长的模型列表也一起滚走。 */
+           设置页使用独立的表面色，避免卡片与纯黑背景混在一起。 */
         .settings-overlay {
+            --settings-bg: #f5f6fa;
+            --settings-nav-bg: rgba(255, 255, 255, 0.64);
+            --settings-card: #ffffff;
+            --settings-card-hover: #f8faff;
+            --settings-line: rgba(28, 35, 48, 0.08);
+            --settings-shadow: 0 1px 2px rgba(16, 24, 40, 0.03), 0 8px 24px rgba(16, 24, 40, 0.035);
             position: fixed;
             inset: 0;
-            background: var(--bg);
+            background:
+                radial-gradient(ellipse 65% 45% at 88% -8%, var(--accent-ghost), transparent 72%),
+                var(--settings-bg);
             z-index: 100;
             opacity: 0;
             pointer-events: none;
@@ -2768,6 +2897,14 @@
             justify-content: center;
             overflow: hidden;
         }
+        html.dark-mode .settings-overlay {
+            --settings-bg: #0b0d11;
+            --settings-nav-bg: rgba(17, 19, 24, 0.86);
+            --settings-card: #15181e;
+            --settings-card-hover: #1a1e26;
+            --settings-line: rgba(255, 255, 255, 0.075);
+            --settings-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), 0 10px 28px rgba(0, 0, 0, 0.12);
+        }
         .settings-overlay.open {
             opacity: 1;
             pointer-events: auto;
@@ -2775,13 +2912,11 @@
 
         .settings-shell {
             width: 100%;
-            /* 随视口变宽：窄窗口照旧撑满，宽窗口按比例放大，
-               但封顶 1600px，免得超宽屏上卡片和表单行被拉得过长 */
-            max-width: clamp(1080px, 82vw, 1600px);
+            max-width: 1440px;
             height: 100%;
             display: grid;
-            grid-template-columns: minmax(180px, var(--settings-nav-w, 224px)) minmax(0, 1fr);
-            transform: translateY(22px);
+            grid-template-columns: minmax(196px, var(--settings-nav-w, 232px)) minmax(0, 1fr);
+            transform: translateY(14px);
             opacity: 0;
             transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1),
                         opacity 0.3s ease;
@@ -2792,23 +2927,38 @@
         .settings-nav {
             display: flex;
             flex-direction: column;
-            gap: 6px;
-            padding: 16px 12px 20px 20px;
-            border-right: 0.5px solid var(--border);
+            gap: 8px;
+            padding: 24px 16px 24px;
+            border-right: 1px solid var(--settings-line);
+            background: var(--settings-nav-bg);
             overflow-y: auto;
             min-width: 0;
         }
         .settings-nav-head {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 0 4px 12px;
-            margin-bottom: 4px;
+            gap: 12px;
+            padding: 0 4px 20px;
+            margin-bottom: 2px;
+        }
+        .settings-nav-heading {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            min-width: 0;
+        }
+        .settings-nav-eyebrow {
+            color: var(--text-tertiary);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            line-height: 1.2;
+            white-space: nowrap;
         }
         .settings-nav-title {
-            font-size: 17px;
+            font-size: 19px;
             font-weight: 700;
-            letter-spacing: -0.4px;
+            letter-spacing: -0.45px;
             color: var(--text);
             overflow: hidden;
             text-overflow: ellipsis;
@@ -2817,17 +2967,19 @@
         .settings-nav-list {
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 6px;
             min-width: 0;
         }
         .settings-nav-item {
+            position: relative;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 11px;
             width: 100%;
-            padding: 9px 11px;
-            border: none;
-            border-radius: var(--radius-sm);
+            min-height: 44px;
+            padding: 10px 12px;
+            border: 1px solid transparent;
+            border-radius: 12px;
             background: transparent;
             color: var(--text-secondary);
             font-family: inherit;
@@ -2837,17 +2989,32 @@
             text-align: left;
             cursor: pointer;
             outline: none;
-            transition: background var(--transition), color var(--transition);
+            transition: background var(--transition), color var(--transition), border-color var(--transition);
         }
-        .settings-nav-item:hover { background: var(--surface-hover); color: var(--text); }
+        .settings-nav-item:hover {
+            background: var(--settings-card);
+            border-color: var(--settings-line);
+            color: var(--text);
+        }
         .settings-nav-item.active {
             background: var(--accent-ghost);
+            border-color: var(--accent-ring);
             color: var(--accent);
+        }
+        .settings-nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: -1px;
+            top: 12px;
+            bottom: 12px;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+            background: var(--accent);
         }
         .settings-nav-item:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
         .settings-nav-icon {
-            width: 17px;
-            height: 17px;
+            width: 18px;
+            height: 18px;
             flex-shrink: 0;
         }
         .settings-nav-label {
@@ -2859,42 +3026,45 @@
         }
         .settings-nav-badge {
             flex-shrink: 0;
-            min-width: 20px;
-            padding: 1px 6px;
+            min-width: 24px;
+            padding: 2px 7px;
             border-radius: var(--radius-full);
             background: var(--surface-tertiary);
             color: var(--text-tertiary);
-            font-size: 11px;
+            font-size: 10.5px;
             font-weight: 700;
+            line-height: 1.4;
             text-align: center;
             font-variant-numeric: tabular-nums;
         }
         .settings-nav-badge:empty { display: none; }
         .settings-nav-item.active .settings-nav-badge {
-            background: var(--accent);
-            color: #fff;
+            background: var(--accent-ring);
+            color: var(--accent);
         }
 
         .settings-back-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-full);
-            border: none;
-            background: var(--surface-secondary);
+            width: 36px;
+            height: 36px;
+            border-radius: 11px;
+            border: 1px solid var(--settings-line);
+            background: var(--settings-card);
             color: var(--text-secondary);
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             flex-shrink: 0;
             outline: none;
-            transition: background var(--transition), color var(--transition), transform var(--transition);
+            transition: background var(--transition), color var(--transition), transform var(--transition), border-color var(--transition);
         }
         .settings-back-btn:hover {
-            background: var(--surface-tertiary);
-            color: var(--text);
+            background: var(--settings-card-hover);
+            border-color: var(--accent-ring);
+            color: var(--accent);
         }
-        .settings-back-btn:active { transform: scale(0.92); }
+        .settings-back-btn:active { transform: scale(0.94); }
         .settings-back-btn:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
         .settings-back-btn svg { width: 17px; height: 17px; }
 
@@ -2903,7 +3073,8 @@
             min-width: 0;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 0 24px 48px;
+            padding: 0 clamp(24px, 3vw, 40px) 56px;
+            scroll-behavior: smooth;
         }
         .settings-content::-webkit-scrollbar { width: 6px; }
         .settings-content::-webkit-scrollbar-track { background: transparent; }
@@ -2913,31 +3084,45 @@
             position: sticky;
             top: 0;
             z-index: 5;
-            padding: 18px 0 13px;
-            margin-bottom: 16px;
-            background: var(--bg);
-            border-bottom: 0.5px solid var(--border);
+            padding: 27px 0 20px;
+            margin-bottom: 22px;
+            background: var(--settings-bg);
+            border-bottom: 1px solid var(--settings-line);
+        }
+        @supports (backdrop-filter: blur(16px)) {
+            .settings-content-head {
+                background: color-mix(in srgb, var(--settings-bg) 90%, transparent);
+                backdrop-filter: blur(18px);
+            }
         }
         .settings-head-titles { min-width: 0; }
         .settings-title {
             font-weight: 700;
-            font-size: 19px;
+            font-size: 24px;
             margin: 0;
             text-align: left;
-            letter-spacing: -0.5px;
+            letter-spacing: -0.65px;
             color: var(--text);
-            line-height: 1.3;
+            line-height: 1.25;
         }
         .settings-subtitle {
             text-align: left;
-            font-size: 12.5px;
-            color: var(--text-tertiary);
-            margin: 3px 0 0;
-            line-height: 1.5;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 6px 0 0;
+            line-height: 1.55;
         }
+        .settings-subtitle:empty { display: none; }
         .settings-section { margin-bottom: 18px; }
         .settings-pane { display: none; }
-        .settings-pane.active { display: block; }
+        .settings-pane.active {
+            display: block;
+            animation: settings-pane-in 0.24s ease-out;
+        }
+        @keyframes settings-pane-in {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: none; }
+        }
 
         /* ── 使用统计 ── */
         .usage-toolbar {
@@ -2946,19 +3131,21 @@
             justify-content: space-between;
             gap: 12px;
             flex-wrap: wrap;
-            margin-bottom: 14px;
+            margin-bottom: 18px;
         }
         .usage-range {
             display: inline-flex;
-            gap: 2px;
-            padding: 3px;
-            background: var(--surface-secondary);
-            border-radius: var(--radius-full);
+            gap: 3px;
+            padding: 4px;
+            background: var(--settings-card);
+            border: 1px solid var(--settings-line);
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.025);
         }
         .usage-range-btn {
-            padding: 6px 13px;
+            padding: 7px 16px;
             border: none;
-            border-radius: var(--radius-full);
+            border-radius: 8px;
             background: transparent;
             color: var(--text-secondary);
             font-family: inherit;
@@ -2967,72 +3154,84 @@
             white-space: nowrap;
             cursor: pointer;
             outline: none;
-            transition: background var(--transition), color var(--transition);
+            transition: background var(--transition), color var(--transition), box-shadow var(--transition);
         }
-        .usage-range-btn:hover { color: var(--text); }
+        .usage-range-btn:hover { background: var(--surface-hover); color: var(--text); }
         .usage-range-btn.active {
             background: var(--accent);
             color: #fff;
+            box-shadow: 0 3px 10px var(--accent-ring);
         }
         .usage-range-btn:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
         .usage-updated {
+            padding: 5px 9px;
+            border-radius: 7px;
+            background: var(--accent-ghost);
+            color: var(--text-secondary);
             font-size: 11.5px;
-            color: var(--text-tertiary);
+            font-weight: 500;
             font-variant-numeric: tabular-nums;
         }
+        .usage-updated:empty { display: none; }
 
         /* 概览卡片：主数字 + 次要拆解，窄屏自动降列 */
         .usage-cards {
             display: grid;
-            /* 固定 4 张卡：只用 4 列或 2 列。auto-fit 在中等宽度会给出 3 列，
-               第 4 张便单独落到第二行，行高也和前一排对不齐。 */
             grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 10px;
-            margin-bottom: 14px;
+            gap: 12px;
+            margin-bottom: 18px;
         }
-        @media (max-width: 1000px) {
+        @media (max-width: 1100px) {
             .usage-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .usage-card {
             position: relative;
             display: flex;
             flex-direction: column;
-            background: var(--surface-secondary);
-            border: 0.5px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 13px 15px 14px;
+            background: var(--settings-card);
+            border: 1px solid var(--settings-line);
+            border-radius: 16px;
+            box-shadow: var(--settings-shadow);
+            padding: 16px;
             min-width: 0;
-            /* 副行长度不一会让各行卡片高度差十几像素，给个下限使其读作一整排 */
-            min-height: 112px;
+            min-height: 126px;
+            transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
+        }
+        .usage-card:hover {
+            transform: translateY(-1px);
+            border-color: var(--accent-ring);
+            box-shadow: var(--shadow-md);
         }
         /* 命中率条贴在卡片底部，不随副行长短上下浮动 */
         .usage-card .usage-meter { margin-top: auto; }
         .usage-card-head {
             display: flex;
             align-items: center;
-            gap: 6px;
-            margin-bottom: 7px;
+            gap: 9px;
+            margin-bottom: 12px;
         }
         .usage-card-icon {
-            width: 14px;
-            height: 14px;
+            width: 28px;
+            height: 28px;
+            padding: 6px;
+            border-radius: 8px;
+            background: var(--surface-secondary);
             flex-shrink: 0;
-            color: var(--text-tertiary);
+            color: var(--text-secondary);
         }
         .usage-card-label {
-            font-size: 11.5px;
+            font-size: 12px;
             font-weight: 600;
-            color: var(--text-tertiary);
-            letter-spacing: 0.3px;
-            text-transform: uppercase;
+            color: var(--text-secondary);
+            letter-spacing: 0;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .usage-card-value {
-            font-size: 23px;
+            font-size: 27px;
             font-weight: 700;
-            letter-spacing: -0.7px;
+            letter-spacing: -0.85px;
             color: var(--text);
             font-variant-numeric: tabular-nums;
             line-height: 1.1;
@@ -3040,18 +3239,19 @@
         .usage-card-sub {
             font-size: 11.5px;
             color: var(--text-tertiary);
-            margin-top: 5px;
+            margin-top: 7px;
             font-variant-numeric: tabular-nums;
             line-height: 1.45;
         }
         .usage-card.accent .usage-card-value,
         .usage-card.accent .usage-card-icon { color: var(--accent); }
+        .usage-card.accent .usage-card-icon { background: var(--accent-ghost); }
         .usage-card.warn .usage-card-value,
         .usage-card.warn .usage-card-icon { color: #f59e0b; }
         /* 命中率条：把百分比画出来，比纯数字更快读懂 */
         .usage-meter {
-            height: 4px;
-            margin-top: 8px;
+            height: 5px;
+            margin-top: 10px;
             border-radius: var(--radius-full);
             background: var(--surface-tertiary);
             overflow: hidden;
@@ -3060,44 +3260,48 @@
             display: block;
             height: 100%;
             border-radius: var(--radius-full);
-            background: var(--accent);
+            background: linear-gradient(90deg, var(--accent), var(--accent-hover));
             transition: width var(--transition-slow);
         }
 
         .usage-card-block {
-            background: var(--surface-secondary);
-            border: 0.5px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 14px 15px 12px;
-            margin-bottom: 14px;
+            background: var(--settings-card);
+            border: 1px solid var(--settings-line);
+            border-radius: 18px;
+            box-shadow: var(--settings-shadow);
+            padding: 20px 20px 16px;
+            margin-bottom: 16px;
         }
         .usage-block-head {
             display: flex;
             align-items: flex-start;
             justify-content: space-between;
-            gap: 10px;
+            gap: 12px;
             flex-wrap: wrap;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         .usage-block-title {
             display: block;
-            font-size: 13.5px;
+            font-size: 14px;
             font-weight: 700;
             color: var(--text);
             letter-spacing: -0.2px;
         }
         .usage-block-sub {
             display: block;
-            font-size: 11.5px;
+            font-size: 12px;
             color: var(--text-tertiary);
-            margin-top: 2px;
+            margin-top: 4px;
             font-variant-numeric: tabular-nums;
         }
         .usage-block-sub:empty { display: none; }
         .usage-legend {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
+            padding: 6px 9px;
+            border-radius: 8px;
+            background: var(--surface-secondary);
             font-size: 11.5px;
             color: var(--text-secondary);
             flex-shrink: 0;
@@ -3105,18 +3309,18 @@
         .usage-legend span {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
         }
         .usage-legend i {
-            width: 9px;
-            height: 9px;
-            border-radius: 2.5px;
+            width: 8px;
+            height: 8px;
+            border-radius: 3px;
             flex-shrink: 0;
         }
         .usage-chart-wrap {
             position: relative;
             width: 100%;
-            height: 200px;
+            height: 224px;
         }
         .usage-chart {
             display: block;
@@ -3127,8 +3331,8 @@
         .usage-tooltip {
             position: absolute;
             z-index: 3;
-            padding: 8px 11px;
-            border-radius: var(--radius-xs);
+            padding: 9px 12px;
+            border-radius: 10px;
             background: var(--code-bg);
             color: var(--code-text);
             font-size: 11.5px;
@@ -3156,15 +3360,15 @@
         .usage-model-row {
             display: flex;
             align-items: center;
-            gap: 11px;
-            padding: 9px 0;
+            gap: 12px;
+            padding: 12px 2px;
             min-width: 0;
         }
-        .usage-model-row + .usage-model-row { border-top: 0.5px solid var(--border-light); }
+        .usage-model-row + .usage-model-row { border-top: 1px solid var(--settings-line); }
         .usage-model-logo {
-            width: 28px;
-            height: 28px;
-            border-radius: var(--radius-xs);
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
             flex-shrink: 0;
             display: flex;
             align-items: center;
@@ -3175,7 +3379,7 @@
         }
         .usage-model-info { flex: 1; min-width: 0; }
         .usage-model-name {
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 600;
             color: var(--text);
             overflow: hidden;
@@ -3191,14 +3395,12 @@
             white-space: nowrap;
         }
         /* 服务商名与统计各占一行，窄屏才不会把 "43% cached" 截成没有单位的 "43" */
-        .usage-model-meta + .usage-model-meta { margin-top: 1px; }
+        .usage-model-meta + .usage-model-meta { margin-top: 2px; }
         /* 占比条：轨道固定宽度，填充长度表示该模型占最大值的比例，
-           填充内部再按输入/输出分段，一眼看出用量规模与结构。
-           注意填充宽度必须相对轨道计算——写在轨道自身上会相对整行宽度，
-           再被 max-width 截断后所有行都一样长。 */
+           填充内部再按输入/输出分段，一眼看出用量规模与结构。 */
         .usage-model-bar {
-            width: 92px;
-            height: 6px;
+            width: 110px;
+            height: 7px;
             border-radius: var(--radius-full);
             background: var(--surface-tertiary);
             overflow: hidden;
@@ -3215,9 +3417,9 @@
         .usage-model-bar .seg-in { background: var(--accent); }
         .usage-model-bar .seg-out { background: #34c759; }
         .usage-model-total {
-            font-size: 12.5px;
-            font-weight: 600;
-            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 650;
+            color: var(--text);
             font-variant-numeric: tabular-nums;
             min-width: 58px;
             text-align: right;
@@ -3238,6 +3440,8 @@
             justify-content: space-between;
             gap: 12px;
             flex-wrap: wrap;
+            margin-top: 4px;
+            padding: 0 2px;
         }
         .usage-footnote {
             flex: 1;
@@ -3247,13 +3451,13 @@
             line-height: 1.6;
         }
         .usage-reset-btn {
-            padding: 9px 16px;
-            border: 0.5px solid var(--border);
-            border-radius: var(--radius-lg);
-            background: transparent;
+            padding: 9px 14px;
+            border: 1px solid var(--settings-line);
+            border-radius: 10px;
+            background: var(--settings-card);
             color: var(--text-tertiary);
             font-family: inherit;
-            font-size: 12.5px;
+            font-size: 12px;
             font-weight: 600;
             white-space: nowrap;
             cursor: pointer;
@@ -3261,7 +3465,8 @@
             transition: all var(--transition);
         }
         .usage-reset-btn:hover {
-            border-color: #ef4444;
+            border-color: rgba(239, 68, 68, 0.35);
+            background: rgba(239, 68, 68, 0.06);
             color: #ef4444;
         }
         .usage-reset-btn:active { transform: scale(0.98); }
@@ -3271,35 +3476,43 @@
            分组标题与空状态占满整行 ── */
         .model-config-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 12px;
             align-items: stretch;
         }
         .model-config-list .model-group-head,
         .model-config-list .settings-empty { grid-column: 1 / -1; }
 
-        /* ── 模型配置卡片：整卡可点即切换，编辑/删除收进悬浮出现的图标按钮 ── */
+        /* ── 模型配置卡片：整卡可点即切换 ── */
         .model-config-card {
             display: flex;
             align-items: flex-start;
-            gap: 11px;
-            background: var(--surface-secondary);
-            border: 0.5px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 12px 13px;
+            gap: 13px;
+            background: var(--settings-card);
+            border: 1px solid var(--settings-line);
+            border-radius: 16px;
+            box-shadow: var(--settings-shadow);
+            padding: 16px;
+            min-height: 94px;
             cursor: pointer;
-            transition: border-color var(--transition), box-shadow var(--transition),
-                        background var(--transition);
+            transition: transform var(--transition), border-color var(--transition),
+                        box-shadow var(--transition), background var(--transition);
             position: relative;
         }
-        .model-config-card:hover { background: var(--surface-hover); }
+        .model-config-card:hover {
+            transform: translateY(-1px);
+            background: var(--settings-card-hover);
+            border-color: var(--accent-ring);
+            box-shadow: var(--shadow-md);
+        }
         .model-config-card:focus-visible {
             outline: none;
             box-shadow: 0 0 0 3px var(--accent-ring);
         }
         .model-config-card.active {
-            background: var(--accent-ghost);
+            background: linear-gradient(135deg, var(--accent-ghost), var(--settings-card));
             border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent-ring), var(--settings-shadow);
             cursor: default;
         }
         /* 过期的免费模型：整卡灰显、不可再选 */
@@ -3307,30 +3520,35 @@
             opacity: 0.55;
             cursor: not-allowed;
         }
-        .model-config-card.expired:hover { background: var(--surface-secondary); }
+        .model-config-card.expired:hover {
+            transform: none;
+            background: var(--settings-card);
+            border-color: var(--settings-line);
+            box-shadow: var(--settings-shadow);
+        }
         .config-card-logo {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-xs);
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
             flex-shrink: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
+            font-size: 15px;
             font-weight: 700;
             color: #fff;
             margin-top: 1px;
         }
-        .config-card-logo svg { width: 19px; height: 19px; }
+        .config-card-logo svg { width: 21px; height: 21px; }
         .config-card-body { flex: 1; min-width: 0; }
         .config-card-top {
             display: flex;
             align-items: center;
             gap: 7px;
-            margin-bottom: 3px;
+            margin-bottom: 5px;
         }
         .config-card-name {
-            font-weight: 600;
+            font-weight: 650;
             font-size: 14px;
             color: var(--text);
             letter-spacing: -0.2px;
@@ -3373,7 +3591,7 @@
             font-size: 11px;
             color: var(--text-tertiary);
             font-family: var(--font-mono);
-            margin-top: 3px;
+            margin-top: 5px;
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -3414,20 +3632,20 @@
         .config-icon-btn svg { width: 15px; height: 15px; }
 
         /* ── 模型设置分组：免费模型 / 我的模型 ── */
-        .model-group { margin-bottom: 14px; }
+        .model-group { margin-bottom: 16px; }
         .model-group-head {
             display: flex;
             align-items: baseline;
             justify-content: space-between;
             gap: 10px;
-            margin: 6px 2px 9px;
+            margin: 8px 2px 4px;
         }
         .model-group-title {
             font-size: 12px;
             font-weight: 700;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.45px;
             text-transform: uppercase;
-            color: var(--text-tertiary);
+            color: var(--text-secondary);
         }
         .model-group-note {
             font-size: 11.5px;
@@ -3436,35 +3654,65 @@
             text-transform: none;
             color: var(--text-tertiary);
         }
-        /* ── 按请求地址分组的可折叠分组（批量添加的模型不再平铺成一堆）── */
+        /* ── 按请求地址分组的可折叠分组 ── */
         .model-ep-group {
             grid-column: 1 / -1;
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-            gap: 10px;
+            grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+            gap: 12px;
             align-items: stretch;
         }
         .model-ep-head {
+            grid-column: 1 / -1;
+            align-items: center;
+            min-width: 0;
+            min-height: 58px;
+            margin: 0;
+            padding: 13px 15px;
+            border: 1px solid var(--settings-line);
+            border-radius: 14px;
+            background: var(--settings-card);
+            box-shadow: var(--settings-shadow);
             cursor: pointer;
             user-select: none;
-            min-width: 0;
+            transition: background var(--transition), border-color var(--transition);
         }
+        .model-ep-head:hover {
+            background: var(--settings-card-hover);
+            border-color: var(--accent-ring);
+        }
+        .model-ep-head .model-group-title { color: var(--text); font-size: 13px; }
         .model-ep-chevron {
-            width: 12px;
-            height: 12px;
+            width: 26px;
+            height: 26px;
+            padding: 6px;
+            border-radius: 7px;
+            background: var(--surface-secondary);
+            color: var(--text-secondary);
             align-self: center;
             flex-shrink: 0;
-            transition: transform var(--transition);
+            transition: transform var(--transition), background var(--transition);
         }
         .model-ep-count {
-            margin-left: 7px;
+            display: inline-block;
+            margin-left: 8px;
+            padding: 2px 7px;
+            border-radius: var(--radius-full);
+            background: var(--surface-secondary);
+            font-size: 10.5px;
             font-weight: 600;
+            vertical-align: 1px;
             color: var(--text-tertiary);
         }
         .model-ep-address {
             min-width: 0;
             flex: 1 1 auto;
+            font-family: var(--font-mono);
+            font-size: 10.5px;
             text-align: right;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         .model-ep-group.collapsed .model-ep-chevron { transform: rotate(-90deg); }
         .model-ep-group.collapsed .model-ep-body { display: none; }
@@ -3474,18 +3722,21 @@
             flex-direction: column;
             align-items: center;
             text-align: center;
-            padding: 40px 16px 34px;
+            padding: 44px 16px 38px;
+            border: 1px dashed var(--settings-line);
+            border-radius: 16px;
+            background: var(--settings-card);
             color: var(--text-tertiary);
             font-size: 13px;
             line-height: 1.7;
         }
         .settings-empty-icon {
-            width: 46px;
-            height: 46px;
+            width: 48px;
+            height: 48px;
             margin-bottom: 12px;
-            border-radius: var(--radius-full);
-            background: var(--surface-secondary);
-            color: var(--text-muted);
+            border-radius: 14px;
+            background: var(--accent-ghost);
+            color: var(--accent);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -3495,31 +3746,54 @@
         .open-settings-btn {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            justify-content: flex-start;
+            gap: 12px;
             width: 100%;
-            padding: 13px;
-            border: none;
-            border-radius: var(--radius-lg);
-            background: var(--accent);
-            color: #fff;
+            min-height: 64px;
+            padding: 12px 15px;
+            border: 1px solid var(--settings-line);
+            border-radius: 16px;
+            background: var(--settings-card);
+            box-shadow: var(--settings-shadow);
+            color: var(--text);
             cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 8px;
-            transition: all var(--transition);
+            font-size: 13.5px;
+            font-weight: 650;
+            margin: 0 0 22px;
+            transition: background var(--transition), border-color var(--transition),
+                        box-shadow var(--transition), transform var(--transition);
             outline: none;
             font-family: inherit;
+            text-align: left;
         }
         .open-settings-btn:hover {
-            opacity: 0.88;
+            transform: translateY(-1px);
+            background: var(--settings-card-hover);
+            border-color: var(--accent-ring);
+            box-shadow: var(--shadow-md);
         }
-        .open-settings-btn:active {
-            transform: scale(0.98);
+        .open-settings-btn:active { transform: translateY(0); }
+        .open-settings-btn:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
+        .open-settings-btn .open-settings-icon {
+            width: 38px;
+            height: 38px;
+            padding: 9px;
+            border-radius: 11px;
+            background: var(--accent-ghost);
+            color: var(--accent);
+            flex-shrink: 0;
         }
-        .open-settings-btn svg {
-            width: 16px;
-            height: 16px;
+        .open-settings-btn .open-settings-arrow {
+            width: 17px;
+            height: 17px;
+            margin-left: auto;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
+            transition: transform var(--transition), color var(--transition);
+        }
+        .open-settings-btn:hover .open-settings-arrow {
+            transform: translateX(3px);
+            color: var(--accent);
         }
         .settings-label {
             display: block;
@@ -3875,6 +4149,51 @@
         }
         .provider-logo svg { width: 13px; height: 13px; }
 
+        /* 模型图标：按模型 ID 命中的品牌 LOGO；多品牌时在同一格里交替呼吸 */
+        .model-brand-logo {
+            position: relative;
+            overflow: hidden;
+            background: rgba(128, 128, 128, 0.35);
+        }
+        .model-brand-logo .brand-logo-layer {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: inherit;
+            opacity: 0;
+            animation-timing-function: linear;
+            animation-iteration-count: infinite;
+            animation-fill-mode: backwards;
+            animation-delay: calc(var(--i, 0) * 2.6s);
+        }
+        .model-brand-logo .brand-logo-layer:first-child { opacity: 1; }
+        .model-brand-logo.brand-count-2 .brand-logo-layer { animation-name: brandCycle2; animation-duration: 5.2s; }
+        .model-brand-logo.brand-count-3 .brand-logo-layer { animation-name: brandCycle3; animation-duration: 7.8s; }
+        .model-brand-logo.brand-count-4 .brand-logo-layer { animation-name: brandCycle4; animation-duration: 10.4s; }
+        @keyframes brandCycle2 {
+            0% { opacity: 0; }
+            8% { opacity: 1; }
+            42% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+        @keyframes brandCycle3 {
+            0% { opacity: 0; }
+            5% { opacity: 1; }
+            27% { opacity: 1; }
+            33.33% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+        @keyframes brandCycle4 {
+            0% { opacity: 0; }
+            4% { opacity: 1; }
+            20% { opacity: 1; }
+            25% { opacity: 0; }
+            100% { opacity: 0; }
+        }
+
         .settings-actions {
             display: flex;
             gap: 10px;
@@ -4049,32 +4368,34 @@
             .app-logo { width: 26px; height: 26px; }
         }
         /* ── 设置页自适应 ──
-           三档：宽屏用图标+文字的完整目录；中窄屏把目录压成纯图标竖条，
-           省下的横向空间全给内容；手机竖屏改为上下堆叠的横向分段。 */
+           宽屏使用完整目录，中窄屏收成图标栏，手机竖屏改为顶部分段导航。 */
         @media (max-width: 900px) {
-            .settings-shell { --settings-nav-w: 188px; }
-            .settings-content { padding: 0 18px 44px; }
+            .settings-shell { --settings-nav-w: 196px; }
+            .settings-content { padding: 0 22px 44px; }
         }
         @media (max-width: 760px) {
-            .settings-shell { grid-template-columns: 62px minmax(0, 1fr); }
+            .settings-shell { grid-template-columns: 68px minmax(0, 1fr); }
             .settings-nav {
-                padding: 14px 8px 18px 10px;
+                padding: 20px 10px 18px;
                 align-items: center;
             }
             .settings-nav-head {
                 justify-content: center;
-                padding: 0 0 12px;
+                padding: 0 0 16px;
             }
-            .settings-nav-title { display: none; }
+            .settings-nav-heading { display: none; }
             .settings-nav-item {
                 justify-content: center;
+                min-height: 44px;
                 padding: 10px 0;
             }
-            /* 只剩图标时，文字与计数徽标都藏起来，用 title 兜底可读性 */
+            .settings-nav-item.active::before { top: 13px; bottom: 13px; }
             .settings-nav-label,
             .settings-nav-badge { display: none; }
             .settings-nav-icon { width: 19px; height: 19px; }
-            .settings-content { padding: 0 16px 40px; }
+            .settings-content { padding: 0 18px 40px; }
+            .settings-title { font-size: 22px; }
+            .model-ep-address { max-width: 52%; }
         }
         @media (max-width: 560px) {
             .settings-shell {
@@ -4084,11 +4405,11 @@
             .settings-nav {
                 flex-direction: row;
                 align-items: center;
-                gap: 8px;
+                gap: 10px;
                 padding: 10px 12px;
                 padding-top: max(10px, env(safe-area-inset-top, 0px));
                 border-right: none;
-                border-bottom: 0.5px solid var(--border);
+                border-bottom: 1px solid var(--settings-line);
                 overflow-x: auto;
                 overflow-y: hidden;
             }
@@ -4099,41 +4420,74 @@
                 flex-shrink: 0;
             }
             .settings-nav-list {
+                flex: 1;
                 flex-direction: row;
-                gap: 4px;
+                justify-content: center;
+                gap: 3px;
                 padding: 3px;
-                background: var(--surface-secondary);
-                border-radius: var(--radius-full);
+                background: var(--settings-card);
+                border: 1px solid var(--settings-line);
+                border-radius: 11px;
             }
             .settings-nav-item {
-                padding: 7px 14px;
-                border-radius: var(--radius-full);
+                min-height: 34px;
+                padding: 6px 12px;
+                border-radius: 8px;
                 white-space: nowrap;
             }
+            .settings-nav-item.active::before { display: none; }
             .settings-nav-label { display: inline; }
             .settings-nav-icon { display: none; }
             .settings-nav-item.active {
-                background: var(--surface);
-                color: var(--text);
-                box-shadow: var(--shadow-sm);
+                background: var(--accent);
+                border-color: transparent;
+                color: #fff;
+                box-shadow: 0 2px 8px var(--accent-ring);
             }
-            .settings-content { padding: 0 14px 40px; }
-            .settings-content-head { padding: 14px 0 11px; margin-bottom: 14px; }
-            .settings-title { font-size: 17px; }
-            .usage-cards { gap: 8px; }
-            .usage-card { padding: 11px 13px 12px; min-height: 100px; }
-            .usage-card-value { font-size: 20px; }
-            .usage-chart-wrap { height: 168px; }
+            .settings-content { padding: 0 14px 36px; }
+            .settings-content-head { padding: 18px 0 15px; margin-bottom: 18px; }
+            .settings-title { font-size: 20px; }
+            .settings-subtitle { font-size: 12px; }
+            .open-settings-btn { min-height: 58px; margin-bottom: 18px; }
+            .model-config-list,
+            .model-ep-group { grid-template-columns: minmax(0, 1fr); }
+            .model-ep-address { display: none; }
+            .usage-cards { gap: 9px; }
+            .usage-card { padding: 13px; min-height: 116px; }
+            .usage-card-head { gap: 7px; margin-bottom: 10px; }
+            .usage-card-icon { width: 25px; height: 25px; padding: 5px; }
+            .usage-card-label { font-size: 11px; }
+            .usage-card-value { font-size: 22px; }
+            .usage-card-block { padding: 16px 14px 12px; }
+            .usage-chart-wrap { height: 180px; }
             .usage-model-bar { width: 52px; }
             .usage-model-share { display: none; }
             .usage-footer { flex-direction: column; align-items: stretch; }
             .usage-reset-btn { width: 100%; }
+            .wf-setting-section { padding: 18px; }
+            .wf-setting-heading { gap: 11px; margin-bottom: 18px; }
+            .wf-setting-icon { width: 38px; height: 38px; border-radius: 11px; }
+            .wf-setting-icon svg { width: 19px; height: 19px; }
+            .wf-dir-row { flex-wrap: wrap; }
+            .wf-dir-path { flex: 1 0 100%; }
+            .wf-dir-btn { flex: 1; }
         }
         @media (max-width: 400px) {
-            .usage-card-value { font-size: 18px; }
-            .usage-model-bar { width: 34px; }
+            .settings-nav { gap: 7px; padding-left: 9px; padding-right: 9px; }
+            .settings-nav-item { padding-left: 9px; padding-right: 9px; }
+            .settings-back-btn { width: 34px; height: 34px; }
+            .usage-card-value { font-size: 20px; }
+            .usage-model-bar { display: none; }
             .usage-model-total { min-width: 50px; }
             .usage-range-btn { padding: 6px 10px; font-size: 12px; }
+            .usage-updated { padding: 4px 7px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .settings-shell,
+            .settings-pane.active,
+            .usage-card,
+            .model-config-card,
+            .open-settings-btn { animation: none; transition: none; }
         }
         @media (min-width: 1280px) {
             .chat-area,
@@ -4227,6 +4581,60 @@
                 width: 94%;
                 padding: 18px 16px 16px;
             }
+        }
+
+        /* ── 导出对话：会话选择弹窗 ── */
+        .export-conv-list {
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 5px;
+            background: var(--surface-secondary);
+        }
+        .export-conv-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 10px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+        .export-conv-item:hover {
+            background: var(--surface-hover);
+        }
+        .export-conv-item-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--text-tertiary);
+            flex-shrink: 0;
+        }
+        .export-conv-item-content {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .export-conv-item-title {
+            font-size: 13px;
+            color: var(--text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.35;
+        }
+        .export-conv-item-meta {
+            font-size: 10.5px;
+            color: var(--text-tertiary);
+            line-height: 1.2;
+        }
+        .export-conv-empty {
+            padding: 26px 12px;
+            text-align: center;
+            font-size: 12.5px;
+            color: var(--text-tertiary);
         }
         /* ── 手机编程弹出面板 ── */
         .phone-popover {
@@ -4996,21 +5404,44 @@
 
         /* ── 设置面板里的工作流页 ── */
         .wf-setting-section {
-            padding: 16px 2px;
-            border-bottom: 1px solid var(--border-light);
+            padding: 24px;
+            border: 1px solid var(--settings-line);
+            border-radius: 18px;
+            background: var(--settings-card);
+            box-shadow: var(--settings-shadow);
         }
-        .wf-setting-section:last-child { border-bottom: none; }
+        .wf-setting-heading {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 22px;
+        }
+        .wf-setting-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 13px;
+            background: var(--accent-ghost);
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .wf-setting-icon svg { width: 22px; height: 22px; }
+        .wf-setting-copy { min-width: 0; }
         .wf-setting-label {
-            font-size: 13.5px;
+            font-size: 15px;
             font-weight: 700;
             color: var(--text);
-            letter-spacing: -0.1px;
+            letter-spacing: -0.2px;
+            line-height: 1.4;
         }
         .wf-setting-desc {
-            font-size: 12px;
-            color: var(--text-tertiary);
-            margin-top: 3px;
-            line-height: 1.55;
+            max-width: 760px;
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            margin-top: 6px;
+            line-height: 1.7;
         }
         .wf-options {
             display: grid;
@@ -5074,44 +5505,75 @@
         .wf-dir-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-top: 12px;
-            flex-wrap: wrap;
+            gap: 9px;
+            margin-top: 0;
+            padding: 7px;
+            border: 1px solid var(--settings-line);
+            border-radius: 14px;
+            background: var(--surface-secondary);
+            flex-wrap: nowrap;
         }
         .wf-dir-path {
             flex: 1;
-            min-width: 160px;
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            min-width: 0;
+            min-height: 38px;
             font-size: 12px;
             font-family: var(--font-mono);
             color: var(--text-secondary);
-            background: var(--surface-secondary);
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-xs);
-            padding: 8px 11px;
+            padding: 7px 9px;
             word-break: break-all;
-            line-height: 1.4;
+            line-height: 1.5;
         }
-        .wf-dir-path.empty { color: var(--text-tertiary); font-family: var(--font-sans); }
+        .wf-dir-path::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: #34c759;
+            box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.12);
+            flex-shrink: 0;
+        }
+        .wf-dir-path.empty {
+            color: var(--text-tertiary);
+            font-family: var(--font-sans);
+        }
+        .wf-dir-path.empty::before {
+            background: var(--text-muted);
+            box-shadow: 0 0 0 3px var(--accent-ghost);
+        }
         .wf-dir-btn {
             appearance: none;
-            border: 1px solid var(--border);
+            min-height: 38px;
+            border: 1px solid var(--settings-line);
             outline: none;
-            background: var(--surface);
+            background: var(--settings-card);
             color: var(--text-secondary);
             font-family: inherit;
             font-size: 12px;
             font-weight: 600;
-            padding: 8px 13px;
-            border-radius: var(--radius-xs);
+            padding: 9px 14px;
+            border-radius: 9px;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            justify-content: center;
+            gap: 7px;
             transition: all var(--transition);
             flex-shrink: 0;
         }
-        .wf-dir-btn svg { width: 13px; height: 13px; }
-        .wf-dir-btn:hover { background: var(--surface-hover); color: var(--text); }
+        .wf-dir-btn svg { width: 14px; height: 14px; }
+        .wf-dir-btn:hover { background: var(--settings-card-hover); color: var(--text); }
+        #wfPickDirBtn {
+            border-color: transparent;
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 3px 10px var(--accent-ring);
+        }
+        #wfPickDirBtn:hover { background: var(--accent-hover); color: #fff; }
+        .wf-dir-btn:focus-visible { box-shadow: 0 0 0 3px var(--accent-ring); }
         .wf-dir-btn:active { transform: scale(0.97); }
         .wf-dir-clear {
             border-color: transparent;
@@ -5387,7 +5849,10 @@
                                 <polyline points="15 18 9 12 15 6"></polyline>
                             </svg>
                         </button>
-                        <span class="settings-nav-title" id="settingsNavTitle">设置</span>
+                        <div class="settings-nav-heading">
+                            <span class="settings-nav-eyebrow">AI ASSISTANT</span>
+                            <span class="settings-nav-title" id="settingsNavTitle">设置</span>
+                        </div>
                     </div>
                     <div class="settings-nav-list" role="tablist">
                         <button class="settings-nav-item active" id="settingsTabModels" type="button" role="tab" aria-selected="true" aria-controls="settingsPaneModels">
@@ -5417,6 +5882,14 @@
                             </svg>
                             <span class="settings-nav-label" id="settingsNavWorkflow">工作流</span>
                         </button>
+                        <button class="settings-nav-item" id="settingsTabData" type="button" role="tab" aria-selected="false" aria-controls="settingsPaneData">
+                            <svg class="settings-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3v12"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <path d="M4 19h16"></path>
+                            </svg>
+                            <span class="settings-nav-label" id="settingsNavData">数据</span>
+                        </button>
                     </div>
                 </nav>
 
@@ -5429,15 +5902,18 @@
                     </div>
 
                     <div class="settings-pane active" id="settingsPaneModels" role="tabpanel">
-                        <div class="model-config-list" id="modelConfigList"></div>
-
                         <button class="open-settings-btn" id="openDesktopSettingsBtn" type="button">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg class="open-settings-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="12" cy="12" r="3"></circle>
                                 <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"></path>
                             </svg>
                             <span id="openDesktopSettingsBtnLabel">在应用设置中管理模型</span>
+                            <svg class="open-settings-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                <polyline points="13 6 19 12 13 18"></polyline>
+                            </svg>
                         </button>
+                        <div class="model-config-list" id="modelConfigList"></div>
                     </div>
 
                     <div class="settings-pane" id="settingsPaneUsage" role="tabpanel">
@@ -5485,8 +5961,18 @@
 
                     <div class="settings-pane" id="settingsPaneWorkflow" role="tabpanel">
                         <div class="wf-setting-section">
-                            <div class="wf-setting-label" id="wfDocsLabel">工作流文档保存位置</div>
-                            <div class="wf-setting-desc" id="wfDocsDesc">Plan / Spec 工作流生成的文档会按任务名分文件夹保存到该目录，可纳入版本控制长期保留。留空则仅保留在当前会话中。</div>
+                            <div class="wf-setting-heading">
+                                <div class="wf-setting-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 7a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"></path>
+                                        <path d="M8 13h8M8 16h5"></path>
+                                    </svg>
+                                </div>
+                                <div class="wf-setting-copy">
+                                    <div class="wf-setting-label" id="wfDocsLabel">工作流文档保存位置</div>
+                                    <div class="wf-setting-desc" id="wfDocsDesc">Plan / Spec 工作流生成的文档会按任务名分文件夹保存到该目录，可纳入版本控制长期保留。留空则仅保留在当前会话中。</div>
+                                </div>
+                            </div>
                             <div class="wf-dir-row">
                                 <span class="wf-dir-path empty" id="wfDocsDirPath">未设置（仅保留在会话中）</span>
                                 <button class="wf-dir-btn" id="wfPickDirBtn" type="button">
@@ -5496,6 +5982,29 @@
                                 <button class="wf-dir-btn" id="wfOpenDirBtn" type="button" style="display:none;">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                     <span id="wfOpenDirLabel">打开目录</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="settings-pane" id="settingsPaneData" role="tabpanel">
+                        <div class="wf-setting-section">
+                            <div class="wf-setting-heading">
+                                <div class="wf-setting-icon" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                        <polyline points="7 10 12 15 17 10"></polyline>
+                                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                                    </svg>
+                                </div>
+                                <div class="wf-setting-copy">
+                                    <div class="wf-setting-label" id="exportJsonlLabel">导出近期对话 JSONL</div>
+                                    <div class="wf-setting-desc" id="exportJsonlDesc">选择一个近期对话，将其导出为 JSONL 文件（每行一条 JSON 记录，含元信息、对话消息与工具调用结果），保存到指定位置。</div>
+                                </div>
+                            </div>
+                            <div class="wf-dir-row">
+                                <button class="wf-dir-btn" id="exportJsonlBtn" type="button">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                    <span id="exportJsonlBtnLabel">选择对话并导出</span>
                                 </button>
                             </div>
                         </div>
@@ -5533,7 +6042,7 @@
 
     // 服务商品牌 LOGO（24×24，currentColor 填充，白色显示在品牌色方块上）。
     // 来源：@lobehub/icons-static-svg（OpenAI/DeepSeek/Zhipu/Kimi/Huawei/Qwen/SenseNova）、
-    // simple-icons（Xiaomi）；free/custom 为通用图标（Material Symbols, Apache-2.0）。
+    // simple-icons（Xiaomi）；custom 为通用图标（Material Symbols, Apache-2.0）。
     var AI_LOGO_SVG = {
         openai: '<svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z"></path></svg>',
         deepseek: '<svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></svg>',
@@ -5543,9 +6052,32 @@
         huaweipangu: '<svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10.341 17.042s.062-.061 0-.061C7.516 10.902 3.646 6.22 3.646 6.22S1.557 8.168 1.68 10.174c.061 1.52 1.228 2.37 1.228 2.37 1.843 1.763 6.266 4.012 7.31 4.499h.123zm-.737 1.52c0-.061-.123-.061-.123-.061l-7.371.243c.798 1.398 2.15 2.492 3.563 2.188.983-.243 3.194-1.763 3.87-2.25.123-.12.061-.12.061-.12zm.123-.67c.062-.06 0-.12 0-.12C6.471 15.581.206 12.3.206 12.3c-.553 1.763.184 3.161.184 3.161.798 1.702 2.334 2.189 2.334 2.189.676.303 1.413.303 1.413.303h5.529c.061 0 .061-.06.061-.06zm.492-14.831c-.308 0-1.168.243-1.168.243-1.965.486-2.395 2.249-2.395 2.249-.369 1.094 0 2.31 0 2.31.675 2.857 3.87 7.598 4.545 8.57l.062.062c.061 0 .061-.061.061-.061C12.43 5.796 10.22 3.06 10.22 3.06zm2.457 13.373c.061 0 .123-.061.123-.061.737-1.033 3.87-5.714 4.545-8.57 0 0 .369-1.399 0-2.31 0 0-.491-1.764-2.457-2.25 0 0-.553-.121-1.167-.243 0 0-2.211 2.796-1.106 13.312 0 .122.062.122.062.122zm1.72 2.067s-.062 0-.062.06v.122c.738.486 2.826 2.006 3.87 2.249 0 0 1.905.669 3.563-2.188l-7.371-.243zm9.398-6.261s-6.265 3.343-9.521 5.531c0 0-.062.06-.062.122 0 0 0 .06.062.06h5.651s.553 0 1.29-.303c0 0 1.536-.487 2.396-2.25 0-.06.737-1.458.184-3.16zM13.66 17.042s.061.06.122 0c1.045-.547 5.468-2.736 7.31-4.499 0 0 1.168-.911 1.23-2.37.122-2.067-1.967-3.951-1.967-3.951s-3.87 4.559-6.695 10.698c0 0-.062.06 0 .122z"></path></svg>',
         qwen: '<svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.604 1.34c.393.69.784 1.382 1.174 2.075a.18.18 0 00.157.091h5.552c.174 0 .322.11.446.327l1.454 2.57c.19.337.24.478.024.837-.26.43-.513.864-.76 1.3l-.367.658c-.106.196-.223.28-.04.512l2.652 4.637c.172.301.111.494-.043.77-.437.785-.882 1.564-1.335 2.34-.159.272-.352.375-.68.37-.777-.016-1.552-.01-2.327.016a.099.099 0 00-.081.05 575.097 575.097 0 01-2.705 4.74c-.169.293-.38.363-.725.364-.997.003-2.002.004-3.017.002a.537.537 0 01-.465-.271l-1.335-2.323a.09.09 0 00-.083-.049H4.982c-.285.03-.553-.001-.805-.092l-1.603-2.77a.543.543 0 01-.002-.54l1.207-2.12a.198.198 0 000-.197 550.951 550.951 0 01-1.875-3.272l-.79-1.395c-.16-.31-.173-.496.095-.965.465-.813.927-1.625 1.387-2.436.132-.234.304-.334.584-.335a338.3 338.3 0 012.589-.001.124.124 0 00.107-.063l2.806-4.895a.488.488 0 01.422-.246c.524-.001 1.053 0 1.583-.006L11.704 1c.341-.003.724.032.9.34zm-3.432.403a.06.06 0 00-.052.03L6.254 6.788a.157.157 0 01-.135.078H3.253c-.056 0-.07.025-.041.074l5.81 10.156c.025.042.013.062-.034.063l-2.795.015a.218.218 0 00-.2.116l-1.32 2.31c-.044.078-.021.118.068.118l5.716.008c.046 0 .08.02.104.061l1.403 2.454c.046.081.092.082.139 0l5.006-8.76.783-1.382a.055.055 0 01.096 0l1.424 2.53a.122.122 0 00.107.062l2.763-.02a.04.04 0 00.035-.02.041.041 0 000-.04l-2.9-5.086a.108.108 0 010-.113l.293-.507 1.12-1.977c.024-.041.012-.062-.035-.062H9.2c-.059 0-.073-.026-.043-.077l1.434-2.505a.107.107 0 000-.114L9.225 1.774a.06.06 0 00-.053-.031zm6.29 8.02c.046 0 .058.02.034.06l-.832 1.465-2.613 4.585a.056.056 0 01-.05.029.058.058 0 01-.05-.029L8.498 9.841c-.02-.034-.01-.052.028-.054l.216-.012 6.722-.012z"></path></svg>',
         sensenova: '<svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M23 8.333h-7.333v7.334H23V8.333z"></path><path d="M1 1v14.667h7.333V8.333h7.334V1H1z" fill-opacity=".33"></path><path d="M14.038 4.333h.17l1.459 1.456v.17l-1.63-1.626zM13.224 4.333h.17l2.273 2.268v.17l-2.443-2.438zM12.41 4.333h.17l3.087 3.08v.17l-3.257-3.25zM11.596 4.333h.17l3.9 3.892v.108h-.06l-4.01-4zM10.782 4.333h.17l4.01 4h-.17l-4.01-4zM9.968 4.333h.17l4.009 4h-.17l-4.01-4zM9.154 4.333h.17l4.009 4h-.17l-4.01-4zM8.34 4.333h.17l4.01 4h-.17l-4.01-4zM7.521 4.333h.17l4.01 4h-.17l-4.01-4zM6.707 4.333h.17l4.01 4h-.17l-4.01-4zM5.892 4.333h.17l4.009 4h-.17l-4.01-4zM5.077 4.333h.17l4.01 4h-.17l-4.01-4zM4.333 4.403v-.07h.1l4.01 4h-.11v.06l-4-3.99zM4.333 5.215v-.17l4 3.991v.17l-4-3.99zM4.333 6.027v-.17l4 3.991v.17l-4-3.99zM4.333 6.84v-.17l4 3.99v.17l-4-3.99zM4.333 7.652v-.17l4 3.99v.17l-4-3.99zM4.333 8.464v-.17l4 3.99v.17l-4-3.99zM4.333 9.276v-.17l4 3.991v.17l-4-3.991zM4.333 10.088v-.17l4 3.991v.17l-4-3.991zM4.333 10.9v-.17l4 3.991v.17l-4-3.991zM4.333 11.712v-.17l4 3.991v.134h-.036l-3.964-3.955zM4.333 12.526v-.17l3.318 3.31h-.17l-3.148-3.14zM4.333 13.34v-.169l2.502 2.496h-.17L4.333 13.34zM4.333 14.152v-.169l1.688 1.684h-.17l-1.518-1.514zM4.333 14.965v-.17l.874.872h-.17l-.704-.702zM15.667 5.146l-.815-.813h.17l.645.644v.169z"></path><path d="M23 15.667h-7.333V23H23v-7.333z" fill-opacity=".33"></path><path d="M15.667 15.667H8.333V23h7.334v-7.333z"></path></svg>',
-        free: '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="currentColor"><path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.11 0-2.08.6-2.6 1.5l-.4.67-.4-.67C11.08 2.6 10.11 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/></svg>',
         custom: '<svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>'
     };
+
+    // 模型 ID 品牌关键词（小写包含匹配）。命中的品牌会替换模型列表左侧的占位图标；
+    // 同时命中多个品牌时在同一个图标格里交替呼吸；全都没命中才回落到服务商图标。
+    var MODEL_BRAND_LOGOS = [
+        { key: 'deepseek', color: '#4d6bfe', words: ['deepseek', 'deep-seek', 'deep seek'] },
+        { key: 'qwen', color: '#615ced', words: ['qwen', 'qwq', 'tongyi', '通义'] },
+        { key: 'glm', color: '#3859ff', words: ['glm', 'zhipu', 'chatglm', '智谱'] },
+        { key: 'kimi', color: '#17181c', words: ['kimi', 'moonshot'] },
+        { key: 'mimo', color: '#ff6900', words: ['mimo', 'xiaomi', '小米'] },
+        { key: 'huaweipangu', color: '#c7000b', words: ['pangu', 'huawei', '盘古', '华为'] },
+        { key: 'sensenova', color: '#0a5cff', words: ['sensenova', 'sense-nova', '日日新'] },
+        { key: 'openai', color: '#10a37f', words: ['openai', 'open-ai', 'gpt', 'chatgpt', 'davinci'] }
+    ];
+
+    /** 按模型 ID 找出命中的品牌 LOGO（最多 4 个，超出部分截断）。 */
+    function modelBrandLogos(modelId) {
+        var src = String(modelId || '').toLowerCase();
+        if (!src) return [];
+        return MODEL_BRAND_LOGOS.filter(function(brand) {
+            return AI_LOGO_SVG[brand.key] && brand.words.some(function(word) {
+                return src.indexOf(word) >= 0;
+            });
+        }).slice(0, 4);
+    }
 
     // 模型信息更新于 2026-10，来源：各厂商官方模型/定价文档（OpenAI 部分参照
     // Azure OpenAI 模型表）。上下文与最大输出按厂商公告填写；已停售/退役的
@@ -5651,20 +6183,36 @@
             ],
             defaultModel: 'qwen3.7-plus'
         },
-        // NeoWarp 官方免费中转（OpenAI 兼容）。密钥由主进程动态注入，不落盘；
-        // 模型清单与截止时间须与 src-main/ai-model-configs.js 保持一致。
-        free: {
-            name: 'NeoWarp Free', logo: '#16a34a', logoText: 'F',
-            endpoint: 'https://api.sy1.top/v1/chat/completions',
-            supportsVision: false,
+        // Anthropic 原生协议（/v1/messages）：请求体、鉴权头与流式事件都与
+        // OpenAI 不同，见 doApiCall 里的 apiFormat 分支。
+        anthropic: {
+            name: 'Anthropic', logo: '#d97757', logoText: 'A',
+            endpoint: 'https://api.anthropic.com/v1/messages',
+            apiFormat: 'anthropic',
+            supportsVision: true,
+            defaultContextLimit: 200000,
             models: [
-                { id: 'deepseek-v4.1-flash', name: 'DeepSeek V4.1 Flash', supportsReasoning: true, contextLimit: 1000000, maxOutput: 65000 },
-                { id: 'glm-5.3-flash', name: 'GLM-5.3 Flash', supportsReasoning: true, contextLimit: 1000000, maxOutput: 65000 },
-                { id: 'sensenova-6.8-flash-lite', name: 'SenseNova 6.8 Flash Lite', supportsReasoning: false, contextLimit: 1000000, maxOutput: 65000 },
-                { id: 'glm-5.2', name: 'GLM-5.2', supportsReasoning: true, contextLimit: 1000000, maxOutput: 65000 }
+                { id: 'claude-opus-4-5', name: 'Claude Opus 4.5', supportsReasoning: true, contextLimit: 200000, maxOutput: 64000 },
+                { id: 'claude-sonnet-4-5', name: 'Claude Sonnet 4.5', supportsReasoning: true, contextLimit: 200000, maxOutput: 64000 },
+                { id: 'claude-haiku-4-5', name: 'Claude Haiku 4.5', supportsReasoning: false, contextLimit: 200000, maxOutput: 32000 }
             ],
-            defaultModel: 'deepseek-v4.1-flash',
-            isFree: true
+            defaultModel: 'claude-sonnet-4-5'
+        },
+        // Ollama 本地推理（/api/chat）。模型名随用户本地已 pull 的模型变化，
+        // 这里只给几个常见默认值；未命中时按 defaultContextLimit 预算历史。
+        ollama: {
+            name: 'Ollama', logo: '#0f172a', logoText: 'O',
+            endpoint: 'http://localhost:11434/api/chat',
+            apiFormat: 'ollama',
+            supportsVision: false,
+            defaultContextLimit: 131072,
+            models: [
+                { id: 'llama3.3', name: 'Llama 3.3', supportsReasoning: false, contextLimit: 131072, maxOutput: 8192 },
+                { id: 'qwen3', name: 'Qwen3', supportsReasoning: true, contextLimit: 131072, maxOutput: 8192 },
+                { id: 'deepseek-r1', name: 'DeepSeek R1', supportsReasoning: true, contextLimit: 131072, maxOutput: 8192 },
+                { id: 'gemma3', name: 'Gemma 3', supportsReasoning: false, contextLimit: 131072, maxOutput: 8192 }
+            ],
+            defaultModel: 'llama3.3'
         },
         custom: {
             name: 'Custom', nameEn: 'Custom', nameZh: '自定义', logo: '#888', logoText: '?',
@@ -6372,6 +6920,8 @@
     var currentConfig = { apiKey: '', provider: 'openai', model: 'gpt-5.4', customEndpoint: '', customModelId: '', apiFormat: 'openai', name: '', customContextLimit: 1000000, thinkingLevel: 'medium' };
     var currentRequestTokens = 0;
     var historyReplayTokens = 0;
+    // 本轮（一次提问到最终总结）的累计用量与起始时刻，脚注的"本轮 Token / 用时"用它
+    var turnUsage = null;
     var isLoading = false;
     var settingsOpen = false;
     var modelDropdownOpen = false;
@@ -6474,6 +7024,7 @@
             streamRetrying: 'Connection lost. Retrying in {s}s ({n}/{max})',
             streamRetryExhausted: 'Auto-retry failed after 10 attempts. Last error: ',
             emptyStreamResponse: 'The model returned an empty response (the stream ended without any output).',
+            loopDetected: 'The model is stuck in a loop (the same paragraph was repeated 10 times in a row). To avoid wasting tokens, the conversation has been paused.',
             copied: 'Copied',
             copy: 'Copy',
             apply: 'Apply',
@@ -6501,6 +7052,7 @@
             thinkingSection: 'Thinking mode',
             thinkingLabel: 'Effort',
             settingsSubtitle: 'Click a card to switch models. Manage configs in app settings.',
+            workflowSubtitle: 'Choose where Plan and Spec documents are stored on this device.',
             backToChat: 'Back to chat',
             phoneTitle: 'Phone coding',
             phoneScanHint: 'Phone and computer must be on the same network. Scan to view the conversation and send messages — synced in both directions.',
@@ -6540,14 +7092,17 @@
             usageResetDone: 'Usage records cleared',
             usageRemoteOnly: 'Usage records live on the computer',
             undoButton: 'Undo AI changes',
-            undoTooltip: 'Revert the project to how it was before the AI touched it in this chat',
+            undoButtonCount: 'Undo AI changes ({n})',
+            undoTooltip: 'Revert only what the AI changed in this chat — anything you edited yourself afterwards is kept',
             undoAlreadyDone: 'Changes undone',
-            undoConfirmTitle: 'Undo all AI changes in this chat?',
-            undoConfirmDetail: 'The project goes back to how it was at {time}, before the AI first changed anything in this chat. Anything you edited by hand since then is lost too, and this cannot be redone.',
+            undoConfirmTitle: 'Undo the AI changes in this chat?',
+            undoConfirmDetail: 'The AI changed {n} thing(s) in this chat. Only those changes are reverted: anything you edited yourself afterwards stays exactly as it is now.',
             undoConfirmOk: 'Undo changes',
-            undoRunning: 'Restoring the project…',
-            undoDone: 'AI changes undone',
-            undoFailed: 'Could not restore the project',
+            undoRunning: 'Reverting the AI changes…',
+            undoDone: 'Reverted {n} AI change(s)',
+            undoPartial: 'Reverted {n} AI change(s); {kept} kept because you edited them yourself',
+            undoNone: 'Nothing to revert — you already changed every part the AI touched',
+            undoFailed: 'Could not revert the AI changes',
             undoBusy: 'Wait for the current reply to finish first',
             undoRemoteOnly: 'Undo runs on the computer',
             myModelsTitle: 'My models',
@@ -6572,6 +7127,21 @@
             usageTipNone: 'No usage',
             usageFootnote: 'Counted from what the API reports for each request, stored only on this device.',
             usageFootnoteRemote: 'Counted on the computer; this page is a read-only view.',
+            turnTokensLabel: 'This turn {n} tokens',
+            turnTokensTitle: 'Token breakdown',
+            turnTokensTotal: 'Total',
+            turnTokensInput: 'Input',
+            turnCacheHit: 'Cache hit',
+            turnCacheMiss: 'Cache miss',
+            turnCacheWrite: 'Cache write',
+            turnCacheRate: 'Cache hit rate',
+            turnTokensOutput: 'Output',
+            turnReasoning: 'Reasoning',
+            turnReply: 'Reply',
+            turnElapsed: '{t} elapsed',
+            turnSpeedTitle: 'Generation stats',
+            turnSpeedLabel: 'Output speed',
+            turnTtftLabel: 'First token',
             groupProvider: 'Provider',
             groupModel: 'Model',
             groupEndpoint: 'Endpoint',
@@ -6678,6 +7248,15 @@
             wfSettingsDocsDesc: 'Documents generated by Plan / Spec workflows are saved here, grouped in folders by task name, ready for version control. Leave empty to keep them in chats only.',
             wfSpecProgress: '{done}/{total} tasks',
             wfCancelConfirm: 'Cancel this workflow? Generated documents stay in the chat.',
+            tabData: 'Data',
+            dataSubtitle: 'Export your conversations as data files.',
+            exportJsonlLabel: 'Export recent conversation as JSONL',
+            exportJsonlDesc: 'Pick one of your recent conversations and save it as a JSONL file (one JSON record per line: meta, chat messages, tool calls and results) to a location you choose.',
+            exportJsonlBtn: 'Choose conversation & export',
+            exportJsonlPickTitle: 'Choose a conversation to export',
+            exportJsonlEmpty: 'No conversations with messages to export yet.',
+            exportJsonlDone: 'Conversation exported',
+            exportJsonlFail: 'Export failed',
         },
         zh: {
             appTitle: 'AI 助手',
@@ -6730,6 +7309,7 @@
             streamRetrying: '连接断开，{s} 秒后自动重试（{n}/{max}）',
             streamRetryExhausted: '已自动重试 10 次仍失败，最后一次报错：',
             emptyStreamResponse: '模型返回了空响应（流已结束但没有任何输出）。',
+            loopDetected: '模型陷入循环，为了避免Token资源被浪费，对话已暂停',
             copied: '已复制',
             copy: '复制',
             apply: '应用',
@@ -6756,7 +7336,8 @@
             modelSection: '模型',
             thinkingSection: '思考模式',
             thinkingLabel: '思考',
-            settingsSubtitle: '点击卡片即可切换模型，管理入口在下方按钮。',
+            settingsSubtitle: '点击卡片即可切换模型，或在应用设置中管理配置。',
+            workflowSubtitle: '管理 Plan / Spec 文档的本地保存位置与访问方式。',
             backToChat: '返回对话',
             phoneTitle: '手机编程',
             phoneScanHint: '手机与电脑需在同一局域网。扫码后即可在手机上查看对话并发送消息，内容双向实时同步。',
@@ -6796,14 +7377,17 @@
             usageResetDone: '用量记录已清除',
             usageRemoteOnly: '用量记录保存在电脑端',
             undoButton: '撤销 AI 更改',
-            undoTooltip: '把工程恢复到本次对话中 AI 动手之前的状态',
+            undoButtonCount: '撤销 AI 更改（{n}）',
+            undoTooltip: '只回退 AI 在本次对话中做的改动，你之后自己改过的内容会保留',
             undoAlreadyDone: '已撤销',
-            undoConfirmTitle: '撤销本次对话中 AI 的全部更改？',
-            undoConfirmDetail: '工程将恢复到 {time}（AI 在本次对话中第一次改动之前）的状态。你在那之后手动做的修改也会一并丢失，且无法恢复。',
+            undoConfirmTitle: '撤销本次对话中 AI 的改动？',
+            undoConfirmDetail: 'AI 在本次对话中改动了 {n} 处内容。撤销只回退这些改动——你在那之后自己手动修改过的部分会原样保留。',
             undoConfirmOk: '撤销更改',
-            undoRunning: '正在恢复工程…',
-            undoDone: 'AI 的更改已撤销',
-            undoFailed: '恢复工程失败',
+            undoRunning: '正在回退 AI 的改动…',
+            undoDone: '已撤销 {n} 处 AI 改动',
+            undoPartial: '已撤销 {n} 处 AI 改动；另有 {kept} 处你后来改过，已保留',
+            undoNone: '没有可撤销的改动——AI 改过的地方你都已经自己重做过',
+            undoFailed: '回退 AI 改动失败',
             undoBusy: '请先等当前回答结束',
             undoRemoteOnly: '撤销操作在电脑端执行',
             myModelsTitle: '我的模型',
@@ -6828,6 +7412,21 @@
             usageTipNone: '无用量',
             usageFootnote: '数字来自接口对每次请求的回报，仅保存在本机。',
             usageFootnoteRemote: '数字在电脑端统计，本页只用于查看。',
+            turnTokensLabel: '本轮 {n} Token',
+            turnTokensTitle: 'Token 消耗明细',
+            turnTokensTotal: '总计',
+            turnTokensInput: '输入',
+            turnCacheHit: '缓存命中',
+            turnCacheMiss: '缓存未命中',
+            turnCacheWrite: '缓存写入',
+            turnCacheRate: '缓存命中率',
+            turnTokensOutput: '输出',
+            turnReasoning: '思考过程',
+            turnReply: '回复内容',
+            turnElapsed: '用时 {t}',
+            turnSpeedTitle: '生成统计',
+            turnSpeedLabel: 'Token 输出速度',
+            turnTtftLabel: '首字延迟',
             groupProvider: '服务商',
             groupModel: '模型',
             groupEndpoint: '接口地址',
@@ -6933,7 +7532,16 @@
             wfSettingsDocsLabel: '工作流文档保存位置',
             wfSettingsDocsDesc: 'Plan / Spec 工作流生成的文档会按任务名分文件夹保存到该目录，可纳入版本控制长期保留。留空则仅保留在当前会话中。',
             wfSpecProgress: '{done}/{total} 任务',
-            wfCancelConfirm: '取消当前工作流？已生成的文档仍保留在对话中。'
+            wfCancelConfirm: '取消当前工作流？已生成的文档仍保留在对话中。',
+            tabData: '数据',
+            dataSubtitle: '把对话导出为数据文件。',
+            exportJsonlLabel: '导出近期对话 JSONL',
+            exportJsonlDesc: '选择一个近期对话，将其导出为 JSONL 文件（每行一条 JSON 记录，含元信息、对话消息与工具调用结果），保存到指定位置。',
+            exportJsonlBtn: '选择对话并导出',
+            exportJsonlPickTitle: '选择要导出的对话',
+            exportJsonlEmpty: '还没有包含消息的对话可以导出。',
+            exportJsonlDone: '对话已导出',
+            exportJsonlFail: '导出失败'
         }
     };
     TRANSLATIONS['zh-CN'] = TRANSLATIONS.zh;
@@ -6986,9 +7594,9 @@
         if (welcomeSubtitleEl) welcomeSubtitleEl.innerHTML = t('welcomeSubtitle');
         renderWelcomeTags();
         var settingsTitleEl = document.querySelector('.settings-title');
-        if (settingsTitleEl) settingsTitleEl.textContent = settingsTab === 'usage' ? t('tabUsage') : (settingsTab === 'workflow' ? t('tabWorkflow') : t('modelSettings'));
+        if (settingsTitleEl) settingsTitleEl.textContent = settingsTab === 'usage' ? t('tabUsage') : (settingsTab === 'workflow' ? t('tabWorkflow') : (settingsTab === 'data' ? t('tabData') : t('modelSettings')));
         var settingsSubtitleEl = document.getElementById('settingsSubtitle');
-        if (settingsSubtitleEl) settingsSubtitleEl.textContent = settingsTab === 'usage' ? t(IS_REMOTE ? 'usageSubtitleRemote' : 'usageSubtitle') : (settingsTab === 'workflow' ? '' : t('settingsSubtitle'));
+        if (settingsSubtitleEl) settingsSubtitleEl.textContent = settingsTab === 'usage' ? t(IS_REMOTE ? 'usageSubtitleRemote' : 'usageSubtitle') : (settingsTab === 'workflow' ? t('workflowSubtitle') : (settingsTab === 'data' ? t('dataSubtitle') : t('settingsSubtitle')));
         var settingsNavTitleEl = document.getElementById('settingsNavTitle');
         if (settingsNavTitleEl) settingsNavTitleEl.textContent = t('settingsNavTitle');
         // 窄屏下目录只剩图标，把文案挂到 title 上仍可读
@@ -6998,12 +7606,16 @@
         if (navUsageEl) navUsageEl.textContent = t('tabUsage');
         var navWorkflowEl = document.getElementById('settingsNavWorkflow');
         if (navWorkflowEl) navWorkflowEl.textContent = t('tabWorkflow');
+        var navDataEl = document.getElementById('settingsNavData');
+        if (navDataEl) navDataEl.textContent = t('tabData');
         var tabModelsEl = document.getElementById('settingsTabModels');
         if (tabModelsEl) tabModelsEl.title = t('tabModels');
         var tabUsageEl = document.getElementById('settingsTabUsage');
         if (tabUsageEl) tabUsageEl.title = t('tabUsage');
         var tabWorkflowEl = document.getElementById('settingsTabWorkflow');
         if (tabWorkflowEl) tabWorkflowEl.title = t('tabWorkflow');
+        var tabDataEl = document.getElementById('settingsTabData');
+        if (tabDataEl) tabDataEl.title = t('tabData');
         // 工作流设置页与设置面板标签跟随语言刷新
         var wfDocsLabelEl = document.getElementById('wfDocsLabel');
         if (wfDocsLabelEl) wfDocsLabelEl.textContent = t('wfSettingsDocsLabel');
@@ -7013,6 +7625,13 @@
         if (wfPickDirLabelEl) wfPickDirLabelEl.textContent = t('wfDirPick');
         var wfOpenDirLabelEl = document.getElementById('wfOpenDirLabel');
         if (wfOpenDirLabelEl) wfOpenDirLabelEl.textContent = t('wfDirOpen');
+        // 数据页（导出对话 JSONL）文案跟随语言刷新
+        var exportJsonlLabelEl = document.getElementById('exportJsonlLabel');
+        if (exportJsonlLabelEl) exportJsonlLabelEl.textContent = t('exportJsonlLabel');
+        var exportJsonlDescEl = document.getElementById('exportJsonlDesc');
+        if (exportJsonlDescEl) exportJsonlDescEl.textContent = t('exportJsonlDesc');
+        var exportJsonlBtnLabelEl = document.getElementById('exportJsonlBtnLabel');
+        if (exportJsonlBtnLabelEl) exportJsonlBtnLabelEl.textContent = t('exportJsonlBtn');
         renderWorkflowSettingsPane();
         renderWorkflowChip();
         if (wfPopupOpen) wfRenderPopup();
@@ -7128,8 +7747,8 @@
             try { loadConfigs(); } catch(e) { console.error('loadConfigs error:', e); }
             try { loadUsage(); } catch(e) { console.error('loadUsage error:', e); }
             try { loadConversations(); } catch(e) { console.error('loadConversations error:', e); }
-            // 会话里的撤销状态是持久化的，快照却随编辑器进程存亡；启动时核实一次
-            try { verifyUndoSnapshot(); } catch(e) { console.error('verifyUndoSnapshot error:', e); }
+            // 会话里的撤销计数是持久化的，改动日志却随编辑器进程存亡；启动时重新核实
+            try { refreshUndoStatus(); } catch(e) { console.error('refreshUndoStatus error:', e); }
             try { setupDisclaimer(); } catch(e) { console.error('setupDisclaimer error:', e); }
         }
         try { autoResize(); } catch(e) { console.error('autoResize error:', e); }
@@ -7140,6 +7759,7 @@
         // AI 工作流：读取统一设置（默认工作流 + 文档目录）、绑定设置页事件、渲染徽章
         try { loadWorkflowSettings(); } catch(e) { console.error('loadWorkflowSettings error:', e); }
         try { setupWorkflowSettingsEvents(); } catch(e) { console.error('setupWorkflowSettingsEvents error:', e); }
+        try { setupExportSettingsEvents(); } catch(e) { console.error('setupExportSettingsEvents error:', e); }
         try { renderWorkflowChip(); } catch(e) { console.error('renderWorkflowChip error:', e); }
         if (IS_SOLO) {
             try { initSolo(); } catch(e) { console.error('initSolo error:', e); }
@@ -7380,9 +8000,10 @@
             }
         } catch(e) { savedConfigs = []; }
         savedConfigs.forEach(migrateConfigFields);
-        // 内置免费额度已下线：剥离历史版本遗留的内置配置
+        // 内置免费额度已下线（源码里的内置 Key 已删除）：剥离历史版本遗留在
+        // localStorage 里的内置配置，避免旧密钥继续被使用
         savedConfigs = savedConfigs.filter(function(cfg) {
-            return cfg && cfg.provider !== 'neowarpfree';
+            return cfg && cfg.provider !== 'neowarpfree' && !isFreeConfig(cfg);
         });
 
         if (!window.AIAssistantPreload || !AIAssistantPreload.getModelConfigs) {
@@ -7598,8 +8219,8 @@
         saveConversations();
         renderConversationList();
         updateSendBtn();
-        // 会话是持久化的，快照只活在编辑器进程里；核实后再决定要不要显示撤销按钮
-        verifyUndoSnapshot();
+        // 会话是持久化的，改动日志只活在编辑器进程里；核实后再决定要不要显示撤销按钮
+        refreshUndoStatus();
         if (messageInput) messageInput.focus();
     }
 
@@ -7668,10 +8289,9 @@
             if (id === generatingConvId && isLoading) {
                 requestGenerationAbort();
             }
-            var goneConv = conversations[idx];
-            if (goneConv && goneConv.undo && goneConv.undo.snapshotId && window.AIAssistantPreload) {
-                // 快照可达几十 MB，会话都删了就没必要继续占着编辑器内存
-                window.AIAssistantPreload.callTool('dropProjectSnapshot', { snapshotId: goneConv.undo.snapshotId });
+            // 会话都删了，它对应的 AI 改动日志也就没有存在意义了
+            if (window.AIAssistantPreload) {
+                window.AIAssistantPreload.callTool('dropAIChanges', { sessionId: id });
             }
             conversations.splice(idx, 1);
             // 会话没了，侧边栏待办状态一并丢弃
@@ -7834,6 +8454,23 @@
         return (isZhLocale() ? (m.nameZh || m.name) : (m.nameEn || m.name)) || '';
     }
 
+    /**
+     * 配置里真正使用的模型名。预设服务商取本地化展示名，
+     * 自定义渠道 / Ollama 取 customModelId（与 getEffectiveModelId 同一套判断）。
+     * 模型切换器里显示这个，而不是用户给渠道起的名字。
+     */
+    function configModelDisplayName(cfg) {
+        if (!cfg) return '';
+        var p = PROVIDERS[cfg.provider];
+        // 自定义渠道（含未识别的服务商）直接用用户填写的模型 ID，
+        // 不能落到占位项 “自定义模型” 上，否则列表里全是同名条目
+        if (cfg.customModelId && (!p || p.isCustom)) return cfg.customModelId;
+        var m = p && (p.models || []).find(function(x) { return x.id === cfg.model; });
+        if (m) return modelNameDisplayName(m) || m.name || '';
+        if (cfg.customModelId && !cfg.model) return cfg.customModelId;
+        return cfg.model || '';
+    }
+
     function usageModelLabel(key) {
         var parts = String(key).split(':');
         var providerId = parts.shift();
@@ -7848,25 +8485,44 @@
         };
     }
     /**
+     * 把各家形态不一的 usage 解析成同一形状。
+     * Anthropic 的 input_tokens 不含缓存读写部分，需要单独加回来；
+     * OpenAI 兼容接口的 prompt_tokens 已经包含命中缓存的输入。
+     */
+    function parseUsageNumbers(usage, fallbackPrompt) {
+        var out = { prompt: 0, completion: 0, cached: 0, cacheWrite: 0, reasoning: 0, estimated: 0 };
+        if (usage && (usage.prompt_tokens || usage.completion_tokens || usage.total_tokens ||
+                      usage.input_tokens || usage.output_tokens)) {
+            var details = usage.prompt_tokens_details || {};
+            var cacheRead = usage.cache_read_input_tokens || 0;
+            var cacheWrite = usage.cache_creation_input_tokens || 0;
+            // OpenAI 在 prompt_tokens_details.cached_tokens，DeepSeek/Kimi 用
+            // prompt_cache_hit_tokens / cached_tokens，Anthropic 用 cache_read_input_tokens
+            out.cached = details.cached_tokens || usage.prompt_cache_hit_tokens || usage.cached_tokens || cacheRead || 0;
+            out.cacheWrite = details.cache_write_tokens || cacheWrite || 0;
+            out.prompt = (usage.prompt_tokens || usage.input_tokens || 0) + cacheRead + cacheWrite;
+            out.completion = usage.completion_tokens || usage.output_tokens || 0;
+            out.reasoning = (usage.completion_tokens_details || {}).reasoning_tokens || usage.reasoning_tokens || 0;
+            if (!out.prompt && usage.total_tokens) out.prompt = usage.total_tokens;
+        } else {
+            out.prompt = fallbackPrompt || 0;
+            out.estimated = 1;
+        }
+        return out;
+    }
+
+    /**
      * 记一次请求的用量。
      * @param {object|null} usage 接口返回的 usage 对象
      * @param {number} fallbackPrompt 服务端不给 usage 时的本地估算输入量
      */
     function recordUsage(usage, fallbackPrompt) {
         if (IS_REMOTE) return;
-        var prompt = 0, completion = 0, cached = 0, estimated = 0;
-        if (usage && (usage.prompt_tokens || usage.completion_tokens || usage.total_tokens)) {
-            prompt = usage.prompt_tokens || 0;
-            completion = usage.completion_tokens || 0;
-            // 各家字段名不一：OpenAI 在 prompt_tokens_details.cached_tokens，
-            // DeepSeek/Kimi 用 prompt_cache_hit_tokens / cached_tokens。
-            var details = usage.prompt_tokens_details || {};
-            cached = details.cached_tokens || usage.prompt_cache_hit_tokens || usage.cached_tokens || 0;
-            if (!prompt && usage.total_tokens) prompt = usage.total_tokens;
-        } else {
-            prompt = fallbackPrompt || 0;
-            estimated = 1;
-        }
+        var parsed = parseUsageNumbers(usage, fallbackPrompt);
+        var prompt = parsed.prompt;
+        var completion = parsed.completion;
+        var cached = parsed.cached;
+        var estimated = parsed.estimated;
         if (!prompt && !completion) return;
 
         var delta = { requests: 1, prompt: prompt, completion: completion, cached: cached, estimated: estimated };
@@ -7891,6 +8547,59 @@
         saveUsage();
         if (settingsOpen && settingsTab === 'usage') renderUsage();
         phonePushHistory();
+    }
+
+    /** 新回合开始：本轮用量清零，并记下起始时刻供"用时"计算 */
+    function resetTurnUsage() {
+        turnUsage = {
+            prompt: 0, completion: 0, cached: 0, cacheWrite: 0, reasoning: 0,
+            requests: 0, startedAt: Date.now(),
+            // 首字延迟：本轮首个 token 从回合计时起点到抵达的等待时长；
+            // 输出时长：各次请求「首 token → 流结束」的纯输出时间合计（工具循环不计中间执行）
+            firstTokenMs: 0, outputMs: 0
+        };
+    }
+
+    /**
+     * 累加一次接口调用的用量：一轮里可能有多条请求（工具循环），
+     * 脚注上的"本轮"是它们相加的结果。
+     * 思考 Token 只有部分接口回报，没回报时按推理/正文的字符比例从输出里折算，
+     * 保证明细里"思考过程 + 回复内容 = 输出"。
+     */
+    function accumulateTurnUsage(usage, fallbackPrompt, reasoningText, contentText) {
+        if (IS_REMOTE) return;
+        if (!turnUsage) resetTurnUsage();
+        var p = parseUsageNumbers(usage, fallbackPrompt);
+        turnUsage.prompt += p.prompt || 0;
+        turnUsage.completion += p.completion || 0;
+        turnUsage.cached += p.cached || 0;
+        turnUsage.cacheWrite += p.cacheWrite || 0;
+        turnUsage.requests += 1;
+
+        var reasoning = p.reasoning || 0;
+        if (!reasoning && p.completion > 0 && reasoningText) {
+            var rTok = estimateTokens(reasoningText);
+            var cTok = estimateTokens(contentText || '');
+            if (rTok > 0) reasoning = Math.round(p.completion * rTok / (rTok + cTok));
+        }
+        turnUsage.reasoning += Math.min(reasoning, p.completion || 0);
+    }
+
+    /** 定格本轮用量的快照（含用时），既用于渲染脚注，也随消息存档供历史重放 */
+    function snapshotTurnUsage() {
+        if (!turnUsage) return null;
+        if (!turnUsage.prompt && !turnUsage.completion) return null;
+        return {
+            prompt: turnUsage.prompt,
+            completion: turnUsage.completion,
+            cached: turnUsage.cached,
+            cacheWrite: turnUsage.cacheWrite,
+            reasoning: turnUsage.reasoning,
+            requests: turnUsage.requests,
+            elapsedMs: Math.max(0, Date.now() - (turnUsage.startedAt || Date.now())),
+            firstTokenMs: turnUsage.firstTokenMs || 0,
+            outputMs: turnUsage.outputMs || 0
+        };
     }
 
     /** 把一组「模型 -> bucket」合并成一个总 bucket */
@@ -8277,11 +8986,12 @@
     }
 
     function setSettingsTab(tab) {
-        settingsTab = ['usage', 'workflow'].indexOf(tab) >= 0 ? tab : 'models';
+        settingsTab = ['usage', 'workflow', 'data'].indexOf(tab) >= 0 ? tab : 'models';
         var pairs = [
             ['settingsTabModels', 'settingsPaneModels', 'models'],
             ['settingsTabUsage', 'settingsPaneUsage', 'usage'],
-            ['settingsTabWorkflow', 'settingsPaneWorkflow', 'workflow']
+            ['settingsTabWorkflow', 'settingsPaneWorkflow', 'workflow'],
+            ['settingsTabData', 'settingsPaneData', 'data']
         ];
         pairs.forEach(function(p) {
             var btn = document.getElementById(p[0]);
@@ -8291,9 +9001,9 @@
             if (pane) pane.classList.toggle('active', on);
         });
         var titleEl = document.getElementById('settingsTitle');
-        if (titleEl) titleEl.textContent = settingsTab === 'usage' ? t('tabUsage') : (settingsTab === 'workflow' ? t('tabWorkflow') : t('modelSettings'));
+        if (titleEl) titleEl.textContent = settingsTab === 'usage' ? t('tabUsage') : (settingsTab === 'workflow' ? t('tabWorkflow') : (settingsTab === 'data' ? t('tabData') : t('modelSettings')));
         var subtitle = document.getElementById('settingsSubtitle');
-        if (subtitle) subtitle.textContent = settingsTab === 'usage' ? t(IS_REMOTE ? 'usageSubtitleRemote' : 'usageSubtitle') : (settingsTab === 'workflow' ? '' : t('settingsSubtitle'));
+        if (subtitle) subtitle.textContent = settingsTab === 'usage' ? t(IS_REMOTE ? 'usageSubtitleRemote' : 'usageSubtitle') : (settingsTab === 'workflow' ? t('workflowSubtitle') : (settingsTab === 'data' ? t('dataSubtitle') : t('settingsSubtitle')));
         // 切换分类时内容区回到顶部，否则会停在上一页的滚动位置
         var content = document.getElementById('settingsContent');
         if (content) content.scrollTop = 0;
@@ -8504,8 +9214,11 @@
         if (IS_REMOTE && remoteContextLimit) return remoteContextLimit;
         var p = PROVIDERS[currentConfig.provider];
         if (currentConfig.provider === 'custom') return currentConfig.customContextLimit || 1000000;
-        var m = p && p.models.find(function(x) { return x.id === currentConfig.model; });
-        return (m && m.contextLimit) || 1000000;
+        // 模型名由用户自填（Ollama / Anthropic 预设）时按服务商默认上限预算，
+        // 不能一律回落到 1M，否则会远超本地模型的真实上下文
+        var modelId = currentConfig.model || currentConfig.customModelId;
+        var m = p && p.models.find(function(x) { return x.id === modelId; });
+        return (m && m.contextLimit) || (p && p.defaultContextLimit) || 1000000;
     }
 
     function getModelMaxOutput() {
@@ -8936,22 +9649,18 @@
 
     function updateModelDisplay() {
         var m = getModelInfo();
-        var label;
-        if (activeConfigIndex >= 0 && savedConfigs[activeConfigIndex]) {
-            label = savedConfigs[activeConfigIndex].name || (modelNameDisplayName(m) || 'Model');
-        } else {
-            label = modelNameDisplayName(m) || 'Model';
-        }
+        // 切换器上显示模型名，渠道名（配置名）只留在下拉项的次要文案里
+        var label = configModelDisplayName(currentConfig) || modelNameDisplayName(m) || 'Model';
         modelNameDisplay.textContent = label;
         modelShortDisplay.textContent = label.length > 8 ? label.substring(0, 7) + '\u2026' : (label || 'Model');
-        modelStatusDot.style.display = currentConfig.apiKey ? 'inline-block' : 'none';
+        modelStatusDot.style.display = (currentConfig.apiKey || !configNeedsApiKey()) ? 'inline-block' : 'none';
         updateSettingDot();
         updateImageUploadVisibility();
         updateThinkingControlVisibility();
     }
 
     function updateSettingDot() {
-        settingDot.classList.toggle('visible', !currentConfig.apiKey);
+        settingDot.classList.toggle('visible', configNeedsApiKey() && !currentConfig.apiKey);
     }
 
     function updateImageUploadVisibility() {
@@ -9018,6 +9727,15 @@
     }
     function isFreeExpired(cfg) {
         return isFreeConfig(cfg) && (cfg.freeExpired === true || Date.now() >= FREE_MODEL_END_AT);
+    }
+
+    // 当前配置是否必须填写 API Key：Ollama 走本机服务，免费模型由 NeoWarp
+    // 提供额度，两者都不需要用户自备密钥；其余服务商必须有 Key 才能发请求。
+    function configNeedsApiKey() {
+        var cfg = savedConfigs[activeConfigIndex];
+        if (isFreeConfig(cfg)) return false;
+        var p = PROVIDERS[currentConfig.provider] || {};
+        return p.apiFormat !== 'ollama' && currentConfig.apiFormat !== 'ollama';
     }
 
     function selectConfig(idx) {
@@ -9090,7 +9808,7 @@
         function groupKeyOf(cfg) {
             var p = PROVIDERS[cfg.provider] || {};
             if (p.isCustom || cfg.customEndpoint) {
-                return 'ep:' + normalizeCustomEndpoint(cfg.customEndpoint || '');
+                return 'ep:' + normalizeCustomEndpoint(cfg.customEndpoint || '', (p.apiFormat === 'anthropic' || p.apiFormat === 'ollama') ? p.apiFormat : cfg.apiFormat);
             }
             return 'pr:' + cfg.provider;
         }
@@ -9113,7 +9831,7 @@
             var first = savedConfigs[g.idxs[0]];
             var p = PROVIDERS[first.provider] || {};
             var address = (p.isCustom || first.customEndpoint)
-                ? normalizeCustomEndpoint(first.customEndpoint || '')
+                ? normalizeCustomEndpoint(first.customEndpoint || '', (p.apiFormat === 'anthropic' || p.apiFormat === 'ollama') ? p.apiFormat : first.apiFormat)
                 : (p.endpoint || '');
             var title = '';
             for (var i = 0; i < g.idxs.length; i++) {
@@ -9182,8 +9900,7 @@
                     : (!hasUsableKey ? '<span class="config-card-badge warn">' + escapeHtml(t('noKeyBadge')) + '</span>' : '')));
 
         card.innerHTML =
-            '<span class="config-card-logo" style="background:' + (p.logo || '#888') + ';">' +
-            (AI_LOGO_SVG[cfg.provider] || escapeHtml(p.logoText || '?')) + '</span>' +
+            renderModelLogo(cfg, p, 'config-card-logo') +
             '<div class="config-card-body">' +
             '<div class="config-card-top">' +
             '<span class="config-card-name">' + escapeHtml(nameDisplay) + '</span>' + badge +
@@ -9220,22 +9937,34 @@
     // 主进程注册了 tw-ai-proxy 协议，在主进程侧转发请求（无 CORS 限制），
     // 目标地址与请求头编码在查询参数里，SSE 流式响应原样透传。
 
-    // 自定义端点规范化：兼容 base URL（如 https://api.siliconflow.cn/v1）与完整
-    // 端点两种填法（设置侧保存时已规范化，这里请求前双保险）。
-    // 只补 /chat/completions，绝不补 /v1；Anthropic（…/v1/messages）与
-    // Ollama（…/api/chat）样式的完整端点原样返回。
-    function normalizeCustomEndpoint(url) {
+    // 端点规范化：兼容 base URL（如 https://api.siliconflow.cn/v1）与完整端点
+    // 两种填法（设置侧保存时已规范化，这里请求前双保险）。补什么路径取决于
+    // API 格式：OpenAI 兼容补 /chat/completions（绝不补 /v1），Anthropic 补
+    // /v1/messages，Ollama 补 /api/chat；已带对应聊天路径的端点原样返回。
+    function normalizeCustomEndpoint(url, apiFormat) {
         var u = String(url || '').trim();
         if (!u) return u;
         if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
         u = u.replace(/\/+$/, '');
+        if (apiFormat === 'anthropic') {
+            if (/\/v1\/messages$/i.test(u)) return u;
+            if (/\/v1$/i.test(u)) return u + '/messages';
+            return u + '/v1/messages';
+        }
+        if (apiFormat === 'ollama') {
+            if (/\/api\/chat$/i.test(u)) return u;
+            if (!/\/api$/i.test(u)) u += '/api';
+            return u + '/chat';
+        }
         if (/\/(v1\/messages|api\/chat)$/i.test(u)) return u;
         if (!/\/chat\/completions$/i.test(u)) u += '/chat/completions';
         return u;
     }
 
-    function buildAiProxyUrl(endpoint, headers) {
+    function buildAiProxyUrl(endpoint, headers, token) {
         var url = 'tw-ai-proxy://request/?u=' + encodeURIComponent(endpoint);
+        // 能力令牌：主进程按窗口来源签发，没有令牌的转发请求一律 403
+        if (token) url += '&k=' + encodeURIComponent(token);
         if (headers && Object.keys(headers).length) {
             var json = JSON.stringify(headers);
             url += '&h=' + encodeURIComponent(btoa(unescape(encodeURIComponent(json))));
@@ -9243,15 +9972,65 @@
         return url;
     }
 
+    // 令牌由主进程签发（有有效期），这里缓存一份；forceRefresh 时重新取
+    var aiProxyTokenCache = null;
+    function getAiProxyToken(forceRefresh) {
+        if (forceRefresh) aiProxyTokenCache = null;
+        if (!aiProxyTokenCache) {
+            var bridge = window.AIAssistantPreload;
+            if (!bridge || !bridge.getAiProxyToken) {
+                return Promise.reject(new Error('AI proxy bridge unavailable'));
+            }
+            aiProxyTokenCache = bridge.getAiProxyToken().catch(function (err) {
+                aiProxyTokenCache = null;
+                throw err;
+            });
+        }
+        return aiProxyTokenCache;
+    }
+
     var aiProxyBroken = false;
-    function aiFetch(endpoint, options) {
+    async function aiFetch(endpoint, options) {
         if (aiProxyBroken) return fetch(endpoint, options);
-        return fetch(buildAiProxyUrl(endpoint, options.headers), options).catch(function(err) {
+        try {
+            var token = await getAiProxyToken(false);
+            var resp = await fetch(buildAiProxyUrl(endpoint, options.headers, token), options);
+            if (resp.status === 403) {
+                // 令牌可能已过期：作废缓存重取一次再试
+                token = await getAiProxyToken(true);
+                resp = await fetch(buildAiProxyUrl(endpoint, options.headers, token), options);
+            }
+            return resp;
+        } catch (err) {
             if (err && err.name === 'AbortError') throw err;
             // 转发协议不可用（如旧版 Electron 构建）：回退直连并记住，之后不再绕路
             aiProxyBroken = true;
             return fetch(endpoint, options);
-        });
+        }
+    }
+
+    /**
+     * 模型列表左侧图标：模型 ID 命中品牌 LOGO 时优先展示品牌图标，
+     * 命中多个品牌则在同一格里交替呼吸；都没有才回落到服务商的占位图标。
+     */
+    function renderModelLogo(cfg, p, logoClass) {
+        var cls = logoClass || 'provider-logo';
+        var modelId = configModelDisplayName(cfg) || (cfg && cfg.model) || '';
+        var brands = modelBrandLogos(modelId);
+        if (!brands.length) {
+            return '<span class="' + cls + '" style="background:' + ((p && p.logo) || '#888') + ';">' +
+                (AI_LOGO_SVG[cfg.provider] || escapeHtml((p && p.logoText) || '?')) + '</span>';
+        }
+        if (brands.length === 1) {
+            return '<span class="' + cls + ' model-brand-logo" style="background:' + brands[0].color + ';">' +
+                AI_LOGO_SVG[brands[0].key] + '</span>';
+        }
+        var layers = brands.map(function(brand, i) {
+            return '<span class="brand-logo-layer" style="background:' + brand.color + ';--i:' + i + ';">' +
+                AI_LOGO_SVG[brand.key] + '</span>';
+        }).join('');
+        return '<span class="' + cls + ' model-brand-logo brand-count-' + brands.length + '">' +
+            layers + '</span>';
     }
 
     function populateModelSwitcherDropdown() {
@@ -9259,7 +10038,6 @@
         var lastGroup = null;
         savedConfigs.forEach(function(cfg, idx) {
             var p = PROVIDERS[cfg.provider] || {};
-            var m = (p.models || []).find(function(x) { return x.id === cfg.model; });
             var free = isFreeConfig(cfg);
             var expired = isFreeExpired(cfg);
             // 免费模型 / 我的模型 分组标题（活动结束后免费组整体置灰）
@@ -9273,12 +10051,13 @@
             }
             var item = document.createElement('div');
             item.className = 'model-dropdown-item' + (idx === activeConfigIndex ? ' active' : '') + (expired ? ' disabled' : '');
+            // 主文案显示模型名；渠道名（配置名）退到次要文案，多个渠道用同一模型时仍能区分
+            var channelName = cfg.name || providerDisplayName(cfg.provider);
             var trailing = expired
                 ? t('freeEnded')
-                : (free ? t('freeBadge') : (!cfg.apiKey ? t('noKeyBadge') : providerDisplayName(cfg.provider)));
-            item.innerHTML = '<span class="provider-logo" style="background:' + (p.logo || '#888') + ';">' +
-                (AI_LOGO_SVG[cfg.provider] || escapeHtml(p.logoText || '?')) + '</span>' +
-                '<span>' + escapeHtml(cfg.name || (modelNameDisplayName(m) || 'Model')) + '</span>' +
+                : (free ? t('freeBadge') : (cfg.apiKey ? channelName : channelName + ' · ' + t('noKeyBadge')));
+            item.innerHTML = renderModelLogo(cfg, p) +
+                '<span>' + escapeHtml(configModelDisplayName(cfg) || cfg.name || 'Model') + '</span>' +
                 '<span style="font-size:11px;color:var(--text-tertiary);">' +
                 escapeHtml(trailing) + '</span>' +
                 '<svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
@@ -9606,14 +10385,15 @@
             btn.disabled = true;
             btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg>Applying...';
             // 手点 Apply 同样是把 AI 的产物落进工程，因此也要能撤销
-            ensureUndoBaseline('execute_operations').then(function() {
-            window.AIAssistantPreload.applyProject(json).then(function(result) {
+            window.AIAssistantPreload.applyProject(json, activeConversationId || 'default').then(function(result) {
                 btn.disabled = false;
                 if (result && result.success) {
                     btn.classList.add('applied');
                     btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Applied!';
                     setTimeout(function() { btn.classList.remove('applied'); btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Apply'; }, 2000);
                     showToast('Project updated successfully', 'success');
+                    // 应用之后工程里多了一批改动，撤销按钮的计数要跟上
+                    refreshUndoStatus();
                 } else {
                     btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Apply';
                     showToast('Failed to apply project', 'error');
@@ -9622,7 +10402,6 @@
                 btn.disabled = false;
                 btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>Apply';
                 showToast('Failed to apply project', 'error');
-            });
             });
         } catch(e) {
             showToast('Invalid JSON in code block', 'error');
@@ -9759,7 +10538,7 @@
             } else {
                 runningTokens += estimateMessagesTokens([{ role: 'assistant', content: msg.content }]);
                 // appendAIMessage 会按有无 toolCalls 自行决定进分组还是收尾
-                appendAIMessage(msg.content, msg.time, msg.reasoning || '', msg.toolCalls || [], false, runningTokens);
+                appendAIMessage(msg.content, msg.time, msg.reasoning || '', msg.toolCalls || [], false, runningTokens, msg.turnUsage);
             }
         });
         // 历史以工具结果结尾（无最终总结）时也要收起
@@ -10302,7 +11081,7 @@
         return card;
     }
 
-    function appendAIMessage(content, time, reasoning, toolCalls, animate, contextTokens) {
+    function appendAIMessage(content, time, reasoning, toolCalls, animate, contextTokens, turnStats) {
         welcomeMessage.style.display = 'none';
         if (typeof content !== 'string') content = content ? String(content) : '';
         var hasToolCalls = !!(toolCalls && toolCalls.length > 0);
@@ -10376,7 +11155,7 @@
         // 无工具调用 = 本回合的最终总结：收起过程，脚注（Token 用量 + 撤销）挂在底部
         finalizeProcessGroup();
         chatArea.appendChild(wrapper);
-        renderSummaryFooter(wrapper, contextTokens);
+        renderSummaryFooter(wrapper, contextTokens, turnStats);
         scrollToBottom();
     }
 
@@ -11567,6 +12346,218 @@
         if (tabBtn) tabBtn.addEventListener('click', function() { setSettingsTab('workflow'); });
     }
 
+    // ── AI 设置页：导出近期对话为 JSONL ──
+    // 对话记录存在渲染层 localStorage（conversations），流程：选对话 →
+    // 主进程弹保存框选位置 → 把整理好的 JSONL 文本落盘
+    function setupExportSettingsEvents() {
+        var tabBtn = document.getElementById('settingsTabData');
+        if (tabBtn) tabBtn.addEventListener('click', function() { setSettingsTab('data'); });
+        var exportBtn = document.getElementById('exportJsonlBtn');
+        if (exportBtn) exportBtn.addEventListener('click', startExportConversationJsonl);
+    }
+
+    function startExportConversationJsonl() {
+        if (IS_REMOTE || !window.AIAssistantPreload || !AIAssistantPreload.exportConversationJsonl) {
+            showToast(t('manageOnDesktop'), 'error');
+            return;
+        }
+        // 当前会话的最新消息可能还只在 chatHistory 里，先落账再选择
+        saveCurrentConversation();
+        showConversationPickerDialog().then(function(conv) {
+            if (conv) exportConversationAsJsonl(conv);
+        });
+    }
+
+    // 会话选择弹窗：按最近活动排序列出所有含消息的对话，选中后 resolve 该会话
+    function showConversationPickerDialog() {
+        return new Promise(function(resolve) {
+            var candidates = conversations
+                .filter(function(c) { return (c.messages || []).length > 0; })
+                .sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+            var overlay = document.createElement('div');
+            overlay.className = 'dialog-overlay confirm-overlay open';
+            overlay.style.zIndex = '300';
+            var panel = document.createElement('div');
+            panel.className = 'dialog-panel';
+            panel.style.maxWidth = '460px';
+            panel.innerHTML =
+                '<div class="dialog-title">' + escapeHtml(t('exportJsonlPickTitle')) + '</div>' +
+                '<div class="export-conv-list"></div>' +
+                '<div style="display:flex;gap:10px;justify-content:center;margin-top:14px;">' +
+                '<button class="btn btn-secondary" data-action="cancel" style="flex:0 0 auto;padding:10px 22px;">' + t('cancel') + '</button>' +
+                '</div>';
+            var list = panel.querySelector('.export-conv-list');
+            var settled = false;
+            function close(result) {
+                if (settled) return;
+                settled = true;
+                overlay.classList.remove('open');
+                overlay.classList.remove('confirm-overlay');
+                document.removeEventListener('keydown', escHandler);
+                setTimeout(function() { if (overlay.parentNode) overlay.remove(); }, 200);
+                resolve(result);
+            }
+            function escHandler(e) {
+                if (e.key === 'Escape') {
+                    e.stopPropagation();
+                    close(null);
+                }
+            }
+            if (!candidates.length) {
+                var empty = document.createElement('div');
+                empty.className = 'export-conv-empty';
+                empty.textContent = t('exportJsonlEmpty');
+                list.appendChild(empty);
+            }
+            var isZh = (currentLocale || 'en').split('-')[0] === 'zh';
+            candidates.forEach(function(conv) {
+                var msgCount = (conv.messages || []).filter(function(m) {
+                    return m && (m.role === 'user' || (m.role === 'assistant' && m.content));
+                }).length;
+                var metaBits = [formatConversationTime(conv.updatedAt)];
+                if (msgCount > 0) metaBits.push(msgCount + (isZh ? ' 条' : (msgCount > 1 ? ' msgs' : ' msg')));
+                var item = document.createElement('div');
+                item.className = 'export-conv-item';
+                item.innerHTML =
+                    '<svg class="export-conv-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>' +
+                    '<div class="export-conv-item-content">' +
+                    '<span class="export-conv-item-title">' + escapeHtml(conv.title || t('untitledChat')) + '</span>' +
+                    '<span class="export-conv-item-meta">' + escapeHtml(metaBits.join(' · ')) + '</span>' +
+                    '</div>';
+                item.addEventListener('click', function() { close(conv); });
+                list.appendChild(item);
+            });
+            panel.querySelector('[data-action="cancel"]').addEventListener('click', function() { close(null); });
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) close(null); });
+            overlay.appendChild(panel);
+            document.body.appendChild(overlay);
+            document.addEventListener('keydown', escHandler);
+        });
+    }
+
+    // 会话名转安全文件名：去掉非法字符、限长（与工作流文档文件夹同规则）
+    function exportFileNameForConv(conv) {
+        var base = String((conv && conv.title) || '')
+            .replace(/[\\/:*?"<>|\x00-\x1f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 40)
+            .replace(/^\.+/, '') || 'conversation';
+        var d = new Date();
+        var pad = function(n) { return ('0' + n).slice(-2); };
+        var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes());
+        return base + '-' + stamp + '.jsonl';
+    }
+
+    function safeParseJsonArg(str) {
+        if (typeof str !== 'string') return undefined;
+        try { return JSON.parse(str); } catch (e) { return undefined; }
+    }
+
+    function exportToolCallsOf(msg) {
+        var calls = [];
+        if (Array.isArray(msg.toolCalls)) {
+            msg.toolCalls.forEach(function(tc) {
+                if (!tc) return;
+                var args = tc.args;
+                if (args === undefined && typeof tc.raw === 'string') args = safeParseJsonArg(tc.raw);
+                calls.push({ name: tc.name || '', args: args === undefined ? null : args });
+            });
+        } else if (Array.isArray(msg.tool_calls)) {
+            msg.tool_calls.forEach(function(tc) {
+                var fn = (tc && tc.function) || {};
+                var args = safeParseJsonArg(fn.arguments);
+                calls.push({ name: fn.name || '', args: args === undefined ? null : args });
+            });
+        }
+        return calls;
+    }
+
+    // 把会话整理成 JSONL 文本：首行 meta 概览，其后按对话顺序一条消息一行。
+    // tool_result 是界面镜像（同一结果已记在 tool 行里），跳过避免重复。
+    function buildConversationJsonl(conv) {
+        var messages = (conv && conv.messages) || [];
+        var lines = [];
+        lines.push(JSON.stringify({
+            type: 'meta',
+            app: IS_SOLO ? 'NeoWarp SOLO' : 'NeoWarp AI',
+            conversationId: conv.id || '',
+            title: conv.title || '',
+            createdAt: conv.createdAt || null,
+            updatedAt: conv.updatedAt || null,
+            messageCount: messages.length,
+            exportedAt: new Date().toISOString()
+        }));
+        // tool 行本身不带调用名，从 tool_result / assistant.tool_calls 里按 id 补齐
+        var nameById = {};
+        messages.forEach(function(m) {
+            if (m && m.role === 'tool_result' && m.tool_call_id) {
+                nameById[m.tool_call_id] = m.name || '';
+            }
+        });
+        messages.forEach(function(m) {
+            if (!m || !m.role) return;
+            if (m.role === 'tool_result') return;
+            if (m.role === 'user') {
+                var rec = {
+                    type: 'message',
+                    role: 'user',
+                    time: m.time || '',
+                    text: stripBase64Data(typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''))
+                };
+                if (Array.isArray(m.images) && m.images.length) rec.imageCount = m.images.length;
+                lines.push(JSON.stringify(rec));
+            } else if (m.role === 'assistant') {
+                var rec2 = {
+                    type: 'message',
+                    role: 'assistant',
+                    time: m.time || '',
+                    text: stripBase64Data(typeof m.content === 'string' ? m.content : '')
+                };
+                if (m.reasoning) rec2.reasoning = m.reasoning;
+                var calls = exportToolCallsOf(m);
+                if (calls.length) rec2.toolCalls = calls;
+                lines.push(JSON.stringify(rec2));
+            } else if (m.role === 'tool') {
+                lines.push(JSON.stringify({
+                    type: 'tool',
+                    toolCallId: m.tool_call_id || '',
+                    name: nameById[m.tool_call_id] || '',
+                    content: stripBase64Data(typeof m.content === 'string' ? m.content : JSON.stringify(m.content || ''))
+                }));
+            } else {
+                lines.push(JSON.stringify({
+                    type: 'message',
+                    role: String(m.role),
+                    time: m.time || '',
+                    text: stripBase64Data(JSON.stringify(m.content !== undefined ? m.content : ''))
+                }));
+            }
+        });
+        return lines.join('\n') + '\n';
+    }
+
+    function exportConversationAsJsonl(conv) {
+        if (!window.AIAssistantPreload || !AIAssistantPreload.exportConversationJsonl) {
+            showToast(t('manageOnDesktop'), 'error');
+            return;
+        }
+        AIAssistantPreload.exportConversationJsonl({
+            defaultName: exportFileNameForConv(conv),
+            content: buildConversationJsonl(conv)
+        }).then(function(res) {
+            if (res && res.success) {
+                showToast(t('exportJsonlDone'), 'success');
+            } else if (res && res.canceled) {
+                // 用户取消保存框，不算失败
+            } else {
+                showToast((res && res.error) || t('exportJsonlFail'), 'error');
+            }
+        }).catch(function() {
+            showToast(t('exportJsonlFail'), 'error');
+        });
+    }
+
     function buildSystemPrompt(wfState) {
         var lang = getSystemPromptLanguage();
         var wfSection = buildWorkflowPromptSection(wfState);
@@ -11603,7 +12594,16 @@
         }
         var ctx = { currentSprite: '', sprites: [], userRequest: userRequest || '' };
         currentContextMapping = {};
-        if (!projectCodeCache || !projectCodeCache.targets) return ctx;
+        if (!projectCodeCache || !projectCodeCache.targets) {
+            // SOLO：工程已选中但内容暂不可读（后台编辑器仍在加载或已不可用）。
+            // 如实告知模型"暂未就绪"，避免它把工程当成空的而要求重建或报"读不到"
+            if (IS_SOLO && soloProject) {
+                ctx.projectType = 'sb3';
+                ctx.projectName = soloProject.name;
+                ctx.note = 'The project "' + soloProject.name + '" is selected, but its content is not readable right now (the background editor is still loading it or temporarily unavailable). Tell the user to wait a few seconds and try again. Do NOT treat the project as empty and do NOT call create_project.';
+            }
+            return ctx;
+        }
         var targets = projectCodeCache.targets;
         var tidCounter = 0;
         function nextTid() { tidCounter++; return 'b' + tidCounter; }
@@ -11709,16 +12709,18 @@
 
     /* ══════════════════════════════════════════════════════════════════════
        撤销 AI 更改
-       每个会话只保留一个"基线"：AI 在本次对话里第一次动手之前的完整工程快照。
-       因此每条总结上的撤销按钮语义一致——都是"回到这次对话开始前的样子"，
-       而不是逐步回退，符合"撤销此次对话中的全部更改"。
+       不保存任何工程备份。编辑器在 AI 每次改动前后各抓一次工程状态，按
+       「积木脚本 / 变量 / 角色属性 / 角色本身」这些单元记下差异并存入日志
+       （见 editor/gui/ai-undo-journal.js）。
+       撤销时做三路合并：只有"当前值仍然等于 AI 改完之后的值"才回退到改动前，
+       用户后来自己改过的单元原样保留，并在结果里如实告知保留了几处。
 
-       快照本体（sb3 压缩包，含素材）留在编辑器渲染进程，这里只持有 id；
-       它随编辑器进程存活，所以按钮渲染前要先确认快照仍然存在。
+       日志只活在编辑器内存里，所以这里只向编辑器问「能撤多少」，会话记录里
+       只存这个计数；编辑器重开过就问不到东西，按钮自然消失。
        ══════════════════════════════════════════════════════════════════════ */
 
-    // 会改动工程的工具。只读工具（get_*/list_*/搜索/待办/提问）不触发建基线，
-    // 否则用户只是让 AI"看一下"也要付一次全工程打包的开销。
+    // 会改动工程的工具。只读工具（get_*/list_*/搜索/待办/提问）不触发状态刷新，
+    // 否则用户只是让 AI"看一下"也要多走一次 IPC。
     var MUTATING_TOOLS = {
         execute_operations: 1, add_sprite: 1, add_sprite_from_url: 1, delete_sprite: 1,
         duplicate_sprite: 1, rename_sprite: 1, set_sprite_property: 1,
@@ -11727,12 +12729,11 @@
         create_list: 1, add_to_list: 1, insert_to_list: 1, set_list_item: 1,
         delete_from_list: 1, clear_list: 1,
         rename_project: 1, set_stage_size: 1,
-        develop_extension: 1, install_extension: 1,
-        // 点绿旗会跑脚本，而脚本会改变量和角色位置——那也是工程状态的变化
-        click_green_flag: 1
+        develop_extension: 1, install_extension: 1, delete_extension: 1,
+        write_js_file: 1
     };
 
-    /** 当前会话的撤销状态；随会话一起持久化，快照可用性另行核实。 */
+    /** 当前会话的撤销状态；随会话一起持久化，只放计数不放开工程内容。 */
     function currentUndoState() {
         var conv = conversations.find(function(c) { return c.id === activeConversationId; });
         return conv && conv.undo ? conv.undo : null;
@@ -11747,72 +12748,230 @@
     }
 
     /**
-     * 在第一次改动前建立基线。已有基线就直接复用——撤销的目标始终是
-     * "这次对话开始前"，不是上一轮。
+     * 向编辑器查询本会话累积的 AI 改动，并同步到会话状态 + 按钮。
+     * 撤销按钮是否出现完全取决于它：编辑器那边没有日志（比如重开过），按钮就该消失。
+     * @returns {Promise<?object>} 编辑器返回的状态
      */
-    function ensureUndoBaseline(toolName) {
-        if (IS_REMOTE) return Promise.resolve(null);
-        if (!MUTATING_TOOLS[toolName]) return Promise.resolve(null);
-        if (!window.AIAssistantPreload) return Promise.resolve(null);
-        var existing = currentUndoState();
-        if (existing && existing.snapshotId) {
-            // 上一次撤销之后工程已回到基线，这份快照仍然是正确的基线，继续用
-            if (existing.undone) {
-                existing.undone = false;
-                setUndoState(existing);
-                renderUndoButtons();
-            }
-            return Promise.resolve(existing);
-        }
-        var snapshotId = 'undo_' + (activeConversationId || 'conv') + '_' + Date.now();
-        return window.AIAssistantPreload.callTool('captureProjectSnapshot', { snapshotId: snapshotId })
+    function refreshUndoStatus() {
+        if (IS_REMOTE || !window.AIAssistantPreload) return Promise.resolve(null);
+        var convId = activeConversationId;
+        if (!convId) return Promise.resolve(null);
+        return window.AIAssistantPreload.callTool('getAIChangeStatus', { sessionId: convId })
             .then(function(res) {
-                if (!res || !res.success) {
-                    // 建基线失败就不装作能撤销：宁可没有按钮，也别给一个点了没用的
-                    console.warn('undo baseline capture failed:', res && res.error);
-                    return null;
+                if (!res || !res.success) return null;
+                var data = res.data || {};
+                var conv = conversations.find(function(c) { return c.id === convId; });
+                if (!conv) return null;
+                if (data.count > 0) {
+                    conv.undo = {
+                        count: data.count,
+                        toolCount: data.toolCount || 0,
+                        updatedAt: data.updatedAt || Date.now(),
+                        undone: false
+                    };
+                } else if (conv.undo && conv.undo.undone) {
+                    // 已经撤销过：保留「已撤销」的终态，别让按钮又冒出来
+                    conv.undo = { count: 0, undone: true };
+                } else {
+                    delete conv.undo;
                 }
-                var state = { snapshotId: res.data.snapshotId, capturedAt: Date.now(), undone: false };
-                setUndoState(state);
-                renderUndoButtons();
-                return state;
+                saveConversations();
+                if (convId === activeConversationId) renderUndoButtons();
+                return data;
             })
-            .catch(function(err) {
-                console.warn('undo baseline capture threw:', err);
-                return null;
-            });
-    }
-
-    /** 快照只活在编辑器进程里；会话是持久化的，两者可能不同步。 */
-    function verifyUndoSnapshot() {
-        var state = currentUndoState();
-        if (!state || !state.snapshotId || IS_REMOTE || !window.AIAssistantPreload) {
-            renderUndoButtons();
-            return;
-        }
-        window.AIAssistantPreload.callTool('hasProjectSnapshot', { snapshotId: state.snapshotId })
-            .then(function(res) {
-                if (res && res.success && res.data && !res.data.exists) {
-                    // 编辑器重开过，快照没了：清掉状态，按钮也就不再出现
-                    setUndoState(null);
-                }
-                renderUndoButtons();
-            })
-            .catch(function() { renderUndoButtons(); });
+            .catch(function() { return null; });
     }
 
     /**
-     * 总结气泡下方的脚注：Token 用量 + 撤销按钮。
+     * 总结气泡下方的脚注：上下文用量 + 本轮 Token 用量（悬停看明细）+ 用时 + 撤销按钮。
      * 两处收尾路径（流式收尾、历史重放）都走这里，保证样式一致、也不会重复插入。
      */
-    function renderSummaryFooter(wrapper, tokenCount) {
+    function renderSummaryFooter(wrapper, tokenCount, turnStats) {
         if (!wrapper || wrapper.querySelector('.msg-footer')) return;
         var footer = document.createElement('div');
         footer.className = 'msg-footer';
         var usageHtml = formatContextUsageHtml(tokenCount);
         if (usageHtml) footer.innerHTML = usageHtml;
+
+        if (turnStats && ((turnStats.prompt || 0) + (turnStats.completion || 0)) > 0) {
+            var chip = document.createElement('span');
+            chip.className = 'msg-turn-usage';
+            chip._turnUsage = turnStats;
+            chip.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+                'stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline></svg><span></span>';
+            chip.querySelector('span').textContent = tf('turnTokensLabel', {
+                n: ((turnStats.prompt || 0) + (turnStats.completion || 0)).toLocaleString()
+            });
+            chip.addEventListener('mouseenter', function() { showTurnUsageTip(chip); });
+            chip.addEventListener('mouseleave', hideTurnUsageTip);
+            chip.addEventListener('click', function() { showTurnUsageTip(chip); });
+            footer.appendChild(chip);
+
+            if (turnStats.elapsedMs > 0) {
+                var timeEl = document.createElement('span');
+                timeEl.className = 'msg-turn-time';
+                timeEl.textContent = tf('turnElapsed', { t: formatTurnDuration(turnStats.elapsedMs) });
+                // 有计时明细（输出时长 / 首字延迟）才挂悬浮小窗；旧消息没这些字段，保持原样
+                if (turnStats.outputMs > 0 || turnStats.firstTokenMs > 0) {
+                    timeEl.classList.add('has-speed-tip');
+                    timeEl._turnSpeed = turnStats;
+                    timeEl.addEventListener('mouseenter', function() { showTurnSpeedTip(timeEl); });
+                    timeEl.addEventListener('mouseleave', hideTurnUsageTip);
+                    timeEl.addEventListener('click', function() { showTurnSpeedTip(timeEl); });
+                }
+                footer.appendChild(timeEl);
+            }
+        }
+
         wrapper.appendChild(footer);
         renderUndoButtons();
+    }
+
+    // ── 本轮用量明细浮层 ──
+    // 聊天区是滚动容器，浮层放进脚注会被裁切，所以单例挂在 body 上按 fixed 定位。
+    var turnUsageTipEl = null;
+    // 与浮层里进度条一致的配色：命中 / 写入 / 未命中
+    var TURN_USAGE_COLORS = { input: '#3b82f6', hit: '#10b981', miss: '#f87171', write: '#f5c518', output: '#a78bfa' };
+
+    function ensureTurnUsageTip() {
+        if (turnUsageTipEl && turnUsageTipEl.parentNode) return turnUsageTipEl;
+        var el = document.createElement('div');
+        el.className = 'turn-usage-tip';
+        document.body.appendChild(el);
+        turnUsageTipEl = el;
+        // 聊天区滚动、窗口缩放后触发点的位置会变，浮层直接收起避免错位
+        window.addEventListener('scroll', hideTurnUsageTip, true);
+        window.addEventListener('resize', hideTurnUsageTip);
+        // 触屏没有 hover：点别处收起（捕获阶段先跑，点用量本身时随后又被展开）
+        document.addEventListener('click', function(e) {
+            var node = e.target;
+            if (node && node.closest && node.closest('.msg-turn-usage, .msg-turn-time')) return;
+            hideTurnUsageTip();
+        }, true);
+        return el;
+    }
+
+    function hideTurnUsageTip() {
+        if (turnUsageTipEl) turnUsageTipEl.classList.remove('show');
+    }
+
+    /** 用时按 s/m 简写，超过一分钟才带分 */
+    function formatTurnDuration(ms) {
+        var secs = Math.max(0, ms || 0) / 1000;
+        if (secs < 60) return (secs < 10 ? Math.round(secs * 10) / 10 : Math.round(secs)) + 's';
+        var m = Math.floor(secs / 60);
+        var r = Math.round(secs % 60);
+        return m + 'm' + (r > 0 ? r + 's' : '');
+    }
+
+    /**
+     * 明细小框：输入按命中/未命中/写入拆开，输出按思考/回复拆开，
+     * 拆出的子项相加必须等于父项，读起来才对得上账。
+     */
+    function turnUsageTipHtml(s) {
+        var prompt = Math.max(0, s.prompt || 0);
+        var completion = Math.max(0, s.completion || 0);
+        var total = prompt + completion;
+        var cached = Math.min(Math.max(0, s.cached || 0), prompt);
+        var write = Math.min(Math.max(0, s.cacheWrite || 0), prompt - cached);
+        var miss = Math.max(0, prompt - cached - write);
+        var reasoning = Math.min(Math.max(0, s.reasoning || 0), completion);
+        var reply = Math.max(0, completion - reasoning);
+        var hitRate = prompt > 0 ? Math.round(cached / prompt * 1000) / 10 : 0;
+        var C = TURN_USAGE_COLORS;
+
+        function row(color, label, value, sub) {
+            return '<div class="tu-row' + (sub ? ' is-sub' : '') + '">' +
+                (color ? '<i class="tu-dot" style="background:' + color + '"></i>' : '') +
+                '<span class="tu-label">' + escapeHtml(label) + '</span>' +
+                '<span class="tu-val">' + value.toLocaleString() + '</span></div>';
+        }
+
+        var html = '<div class="tu-head"><span>' + escapeHtml(t('turnTokensTitle')) + '</span>' +
+            '<span class="tu-total"><i>' + escapeHtml(t('turnTokensTotal')) + '</i><b>' + total.toLocaleString() + '</b></span></div>';
+        html += row(C.input, t('turnTokensInput'), prompt, false);
+        html += row(C.hit, t('turnCacheHit'), cached, true);
+        html += row(C.miss, t('turnCacheMiss'), miss, true);
+        html += row(C.write, t('turnCacheWrite'), write, true);
+        html += row(C.output, t('turnTokensOutput'), completion, false);
+        html += row(null, t('turnReasoning'), reasoning, true);
+        html += row(null, t('turnReply'), reply, true);
+
+        if (prompt > 0) {
+            html += '<div class="tu-sep"></div>';
+            html += '<div class="tu-rate">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polyline></svg>' +
+                '<span>' + escapeHtml(t('turnCacheRate')) + '</span>' +
+                '<span class="tu-val">' + hitRate.toFixed(1) + '%</span></div>';
+            html += '<div class="tu-bar">';
+            if (cached) html += '<i style="width:' + (cached / prompt * 100) + '%;background:' + C.hit + '"></i>';
+            if (write) html += '<i style="width:' + (write / prompt * 100) + '%;background:' + C.write + '"></i>';
+            if (miss) html += '<i style="width:' + (miss / prompt * 100) + '%;background:' + C.miss + '"></i>';
+            html += '</div>';
+            html += '<div class="tu-legend">' +
+                '<span><i style="background:' + C.hit + '"></i>' + escapeHtml(t('turnCacheHit')) + '</span>' +
+                '<span><i style="background:' + C.write + '"></i>' + escapeHtml(t('turnCacheWrite')) + '</span>' +
+                '<span><i style="background:' + C.miss + '"></i>' + escapeHtml(t('turnCacheMiss')) + '</span></div>';
+        }
+        return html;
+    }
+
+    function showTurnUsageTip(chip) {
+        var stats = chip && chip._turnUsage;
+        if (!stats) return;
+        var el = ensureTurnUsageTip();
+        el.innerHTML = turnUsageTipHtml(stats);
+        el.classList.add('show');
+        positionTurnTip(chip);
+    }
+
+    /** 先渲染再量尺寸：上方放不下时翻到触发点下方（用量 / 速度两个浮层共用） */
+    function positionTurnTip(anchor) {
+        var el = ensureTurnUsageTip();
+        var rect = anchor.getBoundingClientRect();
+        var w = el.offsetWidth;
+        var h = el.offsetHeight;
+        var left = rect.left - 10;
+        if (left + w > window.innerWidth - 10) left = window.innerWidth - 10 - w;
+        if (left < 10) left = 10;
+        var top = rect.top - h - 8;
+        if (top < 10) top = rect.bottom + 8;
+        el.style.left = Math.round(left) + 'px';
+        el.style.top = Math.round(top) + 'px';
+    }
+
+    /**
+     * 用时的小框：Token 输出速度 + 首字延迟。
+     * 速度 = 输出 Token / 纯输出时长（各次请求「首 token → 流结束」之和，
+     * 不含工具执行的空档，否则工具循环会把速度严重拉低）。
+     */
+    function turnSpeedTipHtml(s) {
+        var completion = Math.max(0, s.completion || 0);
+        var outputMs = Math.max(0, s.outputMs || 0);
+        var ttftMs = Math.max(0, s.firstTokenMs || 0);
+        var tps = outputMs > 0 ? completion / (outputMs / 1000) : 0;
+        var C = TURN_USAGE_COLORS;
+
+        function row(color, label, value) {
+            return '<div class="tu-row">' +
+                (color ? '<i class="tu-dot" style="background:' + color + '"></i>' : '') +
+                '<span class="tu-label">' + escapeHtml(label) + '</span>' +
+                '<span class="tu-val">' + value + '</span></div>';
+        }
+
+        var html = '<div class="tu-head"><span>' + escapeHtml(t('turnSpeedTitle')) + '</span></div>';
+        html += row(C.output, t('turnSpeedLabel'), outputMs > 0 ? (Math.round(tps * 10) / 10).toFixed(1) + ' tok/s' : '—');
+        html += row(C.input, t('turnTtftLabel'), ttftMs > 0 ? formatTurnDuration(ttftMs) : '—');
+        return html;
+    }
+
+    function showTurnSpeedTip(el) {
+        var stats = el && el._turnSpeed;
+        if (!stats) return;
+        var tip = ensureTurnUsageTip();
+        tip.innerHTML = turnSpeedTipHtml(stats);
+        tip.classList.add('show');
+        positionTurnTip(el);
     }
 
     /** 按当前撤销状态，同步所有总结脚注里的撤销按钮。 */
@@ -11822,7 +12981,8 @@
         for (var i = 0; i < footers.length; i++) {
             var footer = footers[i];
             var btn = footer.querySelector('.undo-ai-btn');
-            if (!state || !state.snapshotId) {
+            // 只有「有可撤销的改动」或「已经撤销过」时才留按钮
+            if (!state || (!state.undone && !state.count)) {
                 if (btn) btn.remove();
                 continue;
             }
@@ -11835,23 +12995,26 @@
             btn.disabled = !!state.undone;
             btn.classList.toggle('is-done', !!state.undone);
             btn.title = state.undone ? t('undoAlreadyDone') : t('undoTooltip');
+            var label = state.undone
+                ? t('undoAlreadyDone')
+                : (state.count ? tf('undoButtonCount', { n: state.count }) : t('undoButton'));
             btn.innerHTML = state.undone
                 ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>' +
-                  '<span>' + escapeHtml(t('undoAlreadyDone')) + '</span>'
+                  '<span>' + escapeHtml(label) + '</span>'
                 : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10a6 6 0 0 1 0 12h-3"></path></svg>' +
-                  '<span>' + escapeHtml(t('undoButton')) + '</span>';
+                  '<span>' + escapeHtml(label) + '</span>';
         }
     }
 
-    /** 执行撤销：确认 → 恢复快照 → 更新按钮状态。 */
+    /** 执行撤销：确认 → 只回退 AI 的改动 → 更新按钮状态。 */
     function performUndo() {
         var state = currentUndoState();
-        if (!state || !state.snapshotId || state.undone) return;
+        if (!state || state.undone || !state.count) return;
         if (isLoading) { showToast(t('undoBusy'), 'error'); return; }
         if (IS_REMOTE) {
             // 手机上同样要确认；确认过后再让电脑执行，不在两端各弹一次
             customConfirm(t('undoConfirmTitle'), {
-                detail: tf('undoConfirmDetail', { time: formatTime(new Date(state.capturedAt)) }),
+                detail: tf('undoConfirmDetail', { n: state.count || 0 }),
                 confirmLabel: t('undoConfirmOk'),
                 danger: true
             }).then(function(ok) {
@@ -11861,7 +13024,7 @@
         }
 
         customConfirm(t('undoConfirmTitle'), {
-            detail: tf('undoConfirmDetail', { time: formatTime(new Date(state.capturedAt)) }),
+            detail: tf('undoConfirmDetail', { n: state.count || 0 }),
             confirmLabel: t('undoConfirmOk'),
             danger: true
         }).then(function(ok) {
@@ -11869,30 +13032,41 @@
         });
     }
 
-    /** 已确认后的恢复动作；手机端在自己那边确认过，直接走这里。 */
+    /** 已确认后的撤销动作；手机端在自己那边确认过，直接走这里。 */
     function performUndoConfirmed() {
         var state = currentUndoState();
-        if (!state || !state.snapshotId || state.undone) return;
+        if (!state || state.undone) return;
+        var convId = activeConversationId;
         showToast(t('undoRunning'), 'success');
-        window.AIAssistantPreload.callTool('restoreProjectSnapshot', { snapshotId: state.snapshotId })
+        window.AIAssistantPreload.callTool('undoAIChanges', { sessionId: convId })
             .then(function(res) {
                 if (!res || !res.success) {
                     showToast((res && res.error) || t('undoFailed'), 'error');
-                    // 快照没了就别再留着按钮骗人
-                    if (res && res.error && /no longer available/.test(res.error)) {
-                        setUndoState(null);
-                        renderUndoButtons();
-                    }
+                    refreshUndoStatus();
                     return;
                 }
-                state.undone = true;
-                setUndoState(state);
-                renderUndoButtons();
+                var data = res.data || {};
+                var reverted = data.reverted || 0;
+                var conflicts = data.conflicts || 0;
+                var conv = conversations.find(function(c) { return c.id === convId; });
+                if (conv) {
+                    // 一处都没退掉（全被用户改过）时不留「已撤销」痕迹，按钮直接消失
+                    if (reverted) conv.undo = { count: 0, undone: true, reverted: reverted, conflicts: conflicts };
+                    else delete conv.undo;
+                }
+                saveConversations();
+                if (convId === activeConversationId) renderUndoButtons();
                 // 工程内容已变，缓存的工程上下文必须失效，否则下一轮 AI 会基于旧快照推理
                 projectCodeCache = null;
                 currentContextMapping = {};
-                showToast(t('undoDone'), 'success');
+                if (!reverted) showToast(t('undoNone'), 'error');
+                else if (conflicts) showToast(tf('undoPartial', { n: reverted, kept: conflicts }), 'success');
+                else showToast(tf('undoDone', { n: reverted }), 'success');
                 phonePushHistory();
+            })
+            .catch(function(err) {
+                showToast(t('undoFailed'), 'error');
+                console.warn('undo failed:', err);
             });
     }
 
@@ -11951,6 +13125,8 @@
     function executeToolCall(toolName, params) {
         if (!window.AIAssistantPreload) return Promise.resolve({ success: false, error: 'No preload' });
         var mappedName = toolName;
+        // 会话标识随每次调用下发：编辑器按会话维护 AI 改动日志（撤销的依据）
+        var undoMeta = { sessionId: activeConversationId || 'default' };
         switch (toolName) {
             case 'get_project_info': mappedName = 'getProjectSummary'; break;
             case 'get_sprite_scripts': mappedName = 'getSpriteScripts'; break;
@@ -12054,14 +13230,10 @@
                 };
             });
         }
-        // SOLO 的 js 文件工具由主进程直接处理，没有编辑器快照可建，跳过撤销基线
-        if (IS_SOLO && (toolName === 'read_js_file' || toolName === 'write_js_file')) {
-            return window.AIAssistantPreload.callTool(mappedName, params);
-        }
-        // SOLO 建新工程：不建撤销基线（还没有工程），结果里带新工程信息时要
+        // SOLO 建新工程：还没有工程，谈不上撤销；结果里带新工程信息时要
         // 立刻同步本地状态（chip、舞台面板），后续积木/文件工具才能接着用
         if (IS_SOLO && toolName === 'create_project') {
-            return window.AIAssistantPreload.callTool(mappedName, params).then(function(res) {
+            return window.AIAssistantPreload.callTool(mappedName, params, undoMeta).then(function(res) {
                 if (res && res.success && res.data && res.data.project) {
                     soloProject = res.data.project;
                     projectCodeCache = null;
@@ -12073,9 +13245,11 @@
                 return res;
             });
         }
-        // 改动类工具执行前先建立撤销基线；只读工具不付这个开销
-        return ensureUndoBaseline(toolName).then(function() {
-            return window.AIAssistantPreload.callTool(mappedName, params);
+        // 调用带上会话标识：编辑器据此把这次的改动记进本对话的撤销日志。
+        // 改动类工具返回后刷新一次「能撤多少」，撤销按钮的计数随之更新。
+        return window.AIAssistantPreload.callTool(mappedName, params, undoMeta).then(function(res) {
+            if (MUTATING_TOOLS[toolName]) refreshUndoStatus();
+            return res;
         });
     }
 
@@ -12098,7 +13272,9 @@
 
     function getEffectiveModelId() {
         var provider = PROVIDERS[currentConfig.provider];
-        if (provider && provider.isCustom && currentConfig.customModelId) {
+        // 自定义服务商与 Ollama 的模型名都填在 customModelId（Ollama 的 model 字段
+        // 由引导页留空，模型名走 customModelId）
+        if (currentConfig.customModelId && (!provider || provider.isCustom || !currentConfig.model)) {
             return currentConfig.customModelId;
         }
         return currentConfig.model;
@@ -12115,41 +13291,552 @@
         return true;
     }
 
-    function doApiCall(messages, callback) {
-        var provider = PROVIDERS[currentConfig.provider];
-        var endpoint = provider.isCustom ? normalizeCustomEndpoint(currentConfig.customEndpoint || provider.endpoint) : provider.endpoint;
-        var modelInfo = getModelInfo();
+    // ── 模型幻觉 / 循环输出检测 ──
+    // 正常模型不会把同一段文字原样重复输出十次；真出现了就是解码退化（幻觉），
+    // 继续生成只会白白烧 token，因此在客户端就地中止本次流。
+    var LOOP_REPEAT_THRESHOLD = 10;    // 同一文段连续出现次数
+    var LOOP_MIN_SEGMENT_CHARS = 8;    // 视为“文段”的最小非空白长度
+    var LOOP_MAX_SEGMENT_CHARS = 600;  // 单段最大长度，超出视为不同文段
+    var LOOP_MIN_TOTAL_CHARS = 160;    // 全文太短时不判定，避免误伤正常重复
 
-        var body = { model: getEffectiveModelId(), messages: messages, stream: true, tools: getActiveTools(), tool_choice: 'auto' };
+    /**
+     * 判断一段文字本身是否由更短片段重复构成（如 "----\n----\n"）。
+     * 这类“文段”是分隔线/表格之类的小片段，不该当成循环证据。
+     * @param {string} str
+     * @returns {boolean}
+     */
+    function isSelfRepeatingSegment(str) {
+        for (var q = 1; q <= str.length / 2; q++) {
+            if (str.length % q !== 0) continue;
+            if (str.slice(0, q).repeat(str.length / q) === str) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 检测文本结尾是否由同一文段连续重复 LOOP_REPEAT_THRESHOLD 次构成。
+     * 只扫尾部窗口：重复块必然紧贴末尾，更早的重复在生成过程中已经被检出过。
+     * @param {string} text
+     * @returns {string|null} 命中的重复文段，未命中返回 null
+     */
+    function detectRepeatedSegment(text) {
+        if (!text) return null;
+        var s = String(text);
+        if (s.length < LOOP_MIN_TOTAL_CHARS) return null;
+        var scan = s.length > 12000 ? s.slice(-12000) : s;
+        var lastChar = scan.charAt(scan.length - 1);
+        var maxPeriod = Math.min(LOOP_MAX_SEGMENT_CHARS, Math.floor(scan.length / LOOP_REPEAT_THRESHOLD));
+        for (var p = 1; p <= maxPeriod; p++) {
+            // 末尾重复块的最后一个字符必须等于全文最后一个字符，先用它做一次
+            // 廉价剪枝，避免每个流分片都做一遍完整比较
+            if (scan.charAt(scan.length - p - 1) !== lastChar) continue;
+            var block = scan.slice(-p);
+            if (block.trim().length < LOOP_MIN_SEGMENT_CHARS) continue;
+            if (isSelfRepeatingSegment(block)) continue;
+            var repeated = true;
+            for (var i = 1; i < LOOP_REPEAT_THRESHOLD; i++) {
+                if (scan.slice(-(i + 1) * p, -i * p) !== block) { repeated = false; break; }
+            }
+            if (repeated) return block;
+        }
+        return null;
+    }
+
+    // ── API 协议适配（OpenAI / Anthropic / Ollama）──
+    // 三种格式的端点、鉴权头、请求体与流式分片结构都不同。此前整条链路只按
+    // OpenAI 组装，配置里选了 anthropic / ollama 也照样发 OpenAI 请求，必然跑不通。
+
+    /**
+     * 当前配置实际生效的 API 格式：服务商预设自带格式（Anthropic / Ollama）优先，
+     * 其次是配置里选定的格式（自定义服务商可在设置中选择）。
+     * @returns {'openai'|'anthropic'|'ollama'}
+     */
+    function getApiFormat() {
+        var provider = PROVIDERS[currentConfig.provider] || {};
+        if (provider.apiFormat === 'anthropic' || provider.apiFormat === 'ollama') {
+            return provider.apiFormat;
+        }
+        if (currentConfig.apiFormat === 'anthropic' || currentConfig.apiFormat === 'ollama') {
+            return currentConfig.apiFormat;
+        }
+        return 'openai';
+    }
+
+    function resolveEndpoint() {
+        var provider = PROVIDERS[currentConfig.provider] || {};
+        var raw = currentConfig.customEndpoint || provider.endpoint || '';
+        return normalizeCustomEndpoint(raw, getApiFormat());
+    }
+
+    /**
+     * 按格式生成鉴权头。
+     * - OpenAI 兼容：Authorization: Bearer
+     * - Anthropic：x-api-key + anthropic-version；页面源是自定义 scheme，
+     *   还要带 anthropic-dangerous-direct-browser-access 才允许浏览器直连
+     * - Ollama：本地默认无鉴权；填了 Key（反向代理场景）时带上 Bearer
+     * @param {'openai'|'anthropic'|'ollama'} apiFormat
+     * @param {string} apiKey
+     * @returns {Record<string, string>}
+     */
+    function buildAuthHeaders(apiFormat, apiKey) {
+        var headers = { 'Content-Type': 'application/json' };
+        if (apiFormat === 'anthropic') {
+            if (apiKey) headers['x-api-key'] = apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+            headers['anthropic-dangerous-direct-browser-access'] = 'true';
+        } else {
+            if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+        }
+        return headers;
+    }
+
+    /** @returns {{mediaType: string, data: string}|null} */
+    function parseDataUrl(url) {
+        var m = /^data:([^;,]+);base64,(.*)$/i.exec(String(url || ''));
+        return m ? { mediaType: m[1], data: m[2] } : null;
+    }
+
+    // OpenAI 风格的消息内容（字符串 / [{type:'text'} | {type:'image_url'}]）转内容块
+    function toContentBlocks(content, allowImages) {
+        var blocks = [];
+        if (typeof content === 'string') {
+            if (content) blocks.push({ type: 'text', text: content });
+            return blocks;
+        }
+        if (!Array.isArray(content)) return blocks;
+        content.forEach(function(part) {
+            if (!part) return;
+            if (part.type === 'text') {
+                if (part.text) blocks.push({ type: 'text', text: part.text });
+            } else if (allowImages && part.type === 'image_url' && part.image_url && part.image_url.url) {
+                var img = parseDataUrl(part.image_url.url);
+                if (img) {
+                    blocks.push({ type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } });
+                } else {
+                    blocks.push({ type: 'text', text: '[image omitted]' });
+                }
+            }
+        });
+        return blocks;
+    }
+
+    function toToolResultContent(content) {
+        if (typeof content === 'string') return content || '(empty)';
+        var blocks = toContentBlocks(content, true);
+        return blocks.length ? blocks : '(empty)';
+    }
+
+    /**
+     * 把内部的 OpenAI 风格消息转成 Anthropic 的 {system, messages}：
+     * - system 角色单独抽到顶层 system 字段
+     * - assistant.tool_calls → tool_use 内容块
+     * - role:'tool' → user 消息里的 tool_result 内容块
+     * - 相邻同角色消息合并（Anthropic 要求 user/assistant 交替）
+     * @param {Array<object>} messages
+     * @returns {{system: string, messages: Array<object>}}
+     */
+    function toAnthropicMessages(messages) {
+        var systemParts = [];
+        var out = [];
+        function pushMessage(role, blocks) {
+            if (!blocks.length) return;
+            var last = out[out.length - 1];
+            if (last && last.role === role) {
+                last.content = last.content.concat(blocks);
+            } else {
+                out.push({ role: role, content: blocks });
+            }
+        }
+        (messages || []).forEach(function(m) {
+            if (!m || !m.role) return;
+            if (m.role === 'system') {
+                var sysText = typeof m.content === 'string'
+                    ? m.content
+                    : toContentBlocks(m.content, false).map(function(b) { return b.text || ''; }).join('\n');
+                if (sysText) systemParts.push(sysText);
+                return;
+            }
+            if (m.role === 'tool') {
+                pushMessage('user', [{
+                    type: 'tool_result',
+                    tool_use_id: m.tool_call_id || '',
+                    content: toToolResultContent(m.content)
+                }]);
+                return;
+            }
+            if (m.role === 'assistant') {
+                var blocks = [];
+                if (typeof m.content === 'string' && m.content) blocks.push({ type: 'text', text: m.content });
+                (m.tool_calls || []).forEach(function(tc) {
+                    var fn = (tc && tc.function) || {};
+                    var input = {};
+                    try { input = JSON.parse(fn.arguments || '{}') || {}; } catch (e) { input = {}; }
+                    blocks.push({
+                        type: 'tool_use',
+                        id: tc.id || ('toolu_' + Math.random().toString(36).slice(2, 12)),
+                        name: fn.name || 'unknown',
+                        input: input
+                    });
+                });
+                pushMessage('assistant', blocks);
+                return;
+            }
+            var userBlocks = toContentBlocks(m.content, true);
+            if (!userBlocks.length) userBlocks.push({ type: 'text', text: '(empty)' });
+            pushMessage('user', userBlocks);
+        });
+        // Anthropic 要求消息以 user 开头
+        if (out.length && out[0].role !== 'user') {
+            out.unshift({ role: 'user', content: [{ type: 'text', text: 'Continue.' }] });
+        }
+        return { system: systemParts.join('\n\n'), messages: out };
+    }
+
+    /**
+     * OpenAI 风格消息转 Ollama 的 messages（角色体系一致，主要差异是
+     * tool_calls 的 arguments 必须是对象、图片放在 images 数组里）。
+     */
+    function toOllamaMessages(messages) {
+        var out = [];
+        (messages || []).forEach(function(m) {
+            if (!m || !m.role) return;
+            if (m.role === 'assistant') {
+                var assistantMsg = { role: 'assistant', content: typeof m.content === 'string' ? m.content : '' };
+                if (m.tool_calls && m.tool_calls.length) {
+                    assistantMsg.tool_calls = m.tool_calls.map(function(tc) {
+                        var fn = (tc && tc.function) || {};
+                        var args = {};
+                        try { args = JSON.parse(fn.arguments || '{}') || {}; } catch (e) { args = {}; }
+                        return { function: { name: fn.name || '', arguments: args } };
+                    });
+                }
+                out.push(assistantMsg);
+                return;
+            }
+            if (m.role === 'tool') {
+                out.push({
+                    role: 'tool',
+                    content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
+                });
+                return;
+            }
+            var text = m.content;
+            var images = [];
+            if (Array.isArray(text)) {
+                var texts = [];
+                text.forEach(function(part) {
+                    if (!part) return;
+                    if (part.type === 'text') texts.push(part.text || '');
+                    else if (part.type === 'image_url' && part.image_url) {
+                        var img = parseDataUrl(part.image_url.url);
+                        if (img) images.push(img.data);
+                    }
+                });
+                text = texts.join('\n');
+            }
+            var msg = { role: m.role, content: typeof text === 'string' ? text : String(text == null ? '' : text) };
+            if (images.length) msg.images = images;
+            out.push(msg);
+        });
+        return out;
+    }
+
+    function toAnthropicTools(tools) {
+        return (tools || []).map(function(tool) {
+            var fn = (tool && tool.function) || {};
+            return {
+                name: fn.name || '',
+                description: fn.description || '',
+                input_schema: fn.parameters || { type: 'object', properties: {} }
+            };
+        });
+    }
+
+    /**
+     * 生成请求体。max_tokens 在三家都是必填/建议项，取值由上下文预算算出。
+     * @param {'openai'|'anthropic'|'ollama'} apiFormat
+     * @param {Array<object>} messages
+     * @param {number} maxTokens
+     * @param {object|null} modelInfo
+     * @returns {object}
+     */
+    function buildChatRequest(apiFormat, messages, maxTokens, modelInfo) {
+        var model = getEffectiveModelId();
+        if (apiFormat === 'anthropic') {
+            var converted = toAnthropicMessages(messages);
+            var anthropicBody = {
+                model: model,
+                max_tokens: maxTokens,
+                stream: true,
+                messages: converted.messages
+            };
+            if (converted.system) anthropicBody.system = converted.system;
+            var anthropicTools = toAnthropicTools(getActiveTools());
+            if (anthropicTools.length) anthropicBody.tools = anthropicTools;
+            return anthropicBody;
+        }
+        if (apiFormat === 'ollama') {
+            var ollamaBody = {
+                model: model,
+                messages: toOllamaMessages(messages),
+                stream: true,
+                options: { num_predict: maxTokens }
+            };
+            var ollamaTools = getActiveTools();
+            if (ollamaTools.length) ollamaBody.tools = ollamaTools;
+            return ollamaBody;
+        }
+        var body = { model: model, messages: messages, stream: true, tools: getActiveTools(), tool_choice: 'auto' };
         applyThinkingParams(body, modelInfo);
         // 让服务端在流末尾附一个 usage 分片，用量统计才有真实数字而非本地估算
         body.stream_options = { include_usage: true };
+        body.max_tokens = maxTokens;
+        return body;
+    }
+
+    function doApiCall(messages, callback) {
+        var apiFormat = getApiFormat();
+        var endpoint = resolveEndpoint();
+        var modelInfo = getModelInfo();
 
         var inputTokens = currentRequestTokens || 0;
         var ctxLimit = getContextLimit();
         var maxOut = getModelMaxOutput();
         var computedMax = Math.min(ctxLimit - inputTokens - 512, maxOut);
         if (!isFinite(computedMax) || computedMax < 1024) computedMax = 1024;
-        body.max_tokens = Math.floor(computedMax);
+        var maxTokens = Math.floor(computedMax);
+
+        // 请求体按格式组装（OpenAI / Anthropic / Ollama）
+        var body = buildChatRequest(apiFormat, messages, maxTokens, modelInfo);
 
         abortController = new AbortController();
         var fullContent = '';
         var fullReasoning = '';
         var toolCallsAccum = {};
         var hasToolCall = false;
+        var usageInfo = null;
+        var finished = false;
+        var streamReader = null;
+        var loopSegment = null;
+        var lastLoopCheckAt = 0;
+        // 本请求的计时：起点记在发出前（含建连/排队），首个产出分片到达时记首字时刻
+        var reqStartedAt = Date.now();
+        var firstTokenAt = 0;
+        function markFirstToken() {
+            if (!firstTokenAt) firstTokenAt = Date.now();
+        }
 
-        var fetchHeaders = { 'Content-Type': 'application/json' };
-        fetchHeaders['Authorization'] = 'Bearer ' + currentConfig.apiKey;
+        function stopStream() {
+            if (streamReader) {
+                try { streamReader.cancel(); } catch (e) {}
+                streamReader = null;
+            }
+        }
+
+        function finish() {
+            if (finished) return;
+            finished = true;
+            stopStream();
+            // 计时入账：输出时长按「首 token → 流结束」累计；首字延迟只记本轮第一次
+            if (firstTokenAt) {
+                if (!turnUsage) resetTurnUsage();
+                turnUsage.outputMs = (turnUsage.outputMs || 0) + Math.max(0, Date.now() - firstTokenAt);
+                if (!turnUsage.firstTokenMs) {
+                    turnUsage.firstTokenMs = Math.max(0, firstTokenAt - (turnUsage.startedAt || reqStartedAt));
+                }
+            }
+            recordUsage(usageInfo, inputTokens);
+            accumulateTurnUsage(usageInfo, inputTokens, fullReasoning, fullContent);
+            if (loopSegment) {
+                // 幻觉检测命中：把已产出的内容交回上层，由上层暂停对话并提示用户
+                callback({ type: 'loop', content: fullContent, reasoning: fullReasoning, segment: loopSegment });
+                return;
+            }
+            if (hasToolCall && Object.keys(toolCallsAccum).length > 0) {
+                var toolCalls = [];
+                Object.keys(toolCallsAccum)
+                    .sort(function(a, b) { return Number(a) - Number(b); })
+                    .forEach(function(k) { toolCalls.push(toolCallsAccum[k]); });
+                callback({ type: 'tool_calls', toolCalls: toolCalls, content: fullContent, reasoning: fullReasoning });
+            } else {
+                // 用量与计时在流收尾时定格，跟正文一起交回上层：之后的续跑/新回合
+                // 都不该再改动这条总结的数字
+                callback({
+                    type: 'text',
+                    content: fullContent,
+                    reasoning: fullReasoning,
+                    turnUsage: snapshotTurnUsage()
+                });
+            }
+        }
+
+        function abortWithError(err) {
+            if (finished) return;
+            finished = true;
+            stopStream();
+            callback({ type: 'error', error: err });
+        }
+
+        function accumulateToolCall(index, id, name, argsChunk) {
+            if (!toolCallsAccum[index]) {
+                toolCallsAccum[index] = { id: id || '', type: 'function', function: { name: '', arguments: '' } };
+            }
+            if (id) toolCallsAccum[index].id = id;
+            if (name) toolCallsAccum[index].function.name = name;
+            if (argsChunk) toolCallsAccum[index].function.arguments += argsChunk;
+            hasToolCall = true;
+        }
+
+        // 正文每次增长后检查是否陷入重复输出；命中即结束本次流
+        function checkRepetition() {
+            if (loopSegment || finished) return;
+            // 每 24 个字符才扫一次，避免逐字符做重复检测拖慢渲染
+            if (fullContent.length - lastLoopCheckAt < 24) return;
+            lastLoopCheckAt = fullContent.length;
+            var segment = detectRepeatedSegment(fullContent);
+            if (segment) {
+                loopSegment = segment;
+                finish();
+            }
+        }
+
+        function handleOpenAIChunk(j) {
+            // usage 分片可能单独到达（此时 choices 为空数组），要先取
+            if (j.usage) usageInfo = j.usage;
+            var delta = j.choices && j.choices[0] && j.choices[0].delta;
+            if (!delta) return;
+            if (delta.content || delta.reasoning_content || delta.tool_calls) markFirstToken();
+            if (delta.reasoning_content) fullReasoning += delta.reasoning_content;
+            if (delta.content) {
+                fullContent += delta.content;
+                checkRepetition();
+            }
+            if (delta.tool_calls) {
+                delta.tool_calls.forEach(function(tc) {
+                    accumulateToolCall(tc.index, tc.id, tc.function && tc.function.name, tc.function && tc.function.arguments);
+                });
+            }
+        }
+
+        function handleAnthropicEvent(j) {
+            if (!j || !j.type) return;
+            if (j.type === 'error') {
+                var apiErr = new Error((j.error && (j.error.message || j.error.type)) || 'Anthropic API error');
+                apiErr.noRetry = true;
+                abortWithError(apiErr);
+                return;
+            }
+            if (j.type === 'message_start') {
+                var startUsage = (j.message && j.message.usage) || {};
+                if (startUsage.input_tokens) {
+                    // Anthropic 的 input_tokens 不含缓存读写，两者要一并留住，
+                    // 本轮明细才能算准命中量与命中率
+                    usageInfo = {
+                        prompt_tokens: startUsage.input_tokens,
+                        completion_tokens: (usageInfo && usageInfo.completion_tokens) || 0,
+                        cache_read_input_tokens: startUsage.cache_read_input_tokens || 0,
+                        cache_creation_input_tokens: startUsage.cache_creation_input_tokens || 0
+                    };
+                }
+                return;
+            }
+            if (j.type === 'content_block_start') {
+                markFirstToken();
+                var block = j.content_block || {};
+                if (block.type === 'tool_use') {
+                    accumulateToolCall(j.index, block.id || '', block.name, '');
+                } else if (block.type === 'text' && block.text) {
+                    fullContent += block.text;
+                    checkRepetition();
+                }
+                return;
+            }
+            if (j.type === 'content_block_delta') {
+                markFirstToken();
+                var delta = j.delta || {};
+                if (delta.type === 'text_delta' && delta.text) {
+                    fullContent += delta.text;
+                    checkRepetition();
+                } else if (delta.type === 'thinking_delta' && delta.thinking) {
+                    fullReasoning += delta.thinking;
+                } else if (delta.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+                    accumulateToolCall(j.index, '', '', delta.partial_json);
+                }
+                return;
+            }
+            if (j.type === 'message_delta') {
+                var outTokens = j.usage && j.usage.output_tokens;
+                if (outTokens) {
+                    usageInfo = usageInfo || {};
+                    usageInfo.completion_tokens = outTokens;
+                }
+                return;
+            }
+            if (j.type === 'message_stop') finish();
+        }
+
+        function handleOllamaChunk(j) {
+            if (!j) return;
+            if (j.error) {
+                var ollamaErr = new Error(String(j.error));
+                ollamaErr.noRetry = true;
+                abortWithError(ollamaErr);
+                return;
+            }
+            var msg = j.message || {};
+            if (msg.thinking || msg.content || msg.tool_calls) markFirstToken();
+            if (msg.thinking) fullReasoning += msg.thinking;
+            if (msg.content) {
+                fullContent += msg.content;
+                checkRepetition();
+            }
+            if (msg.tool_calls) {
+                msg.tool_calls.forEach(function(tc) {
+                    var fn = (tc && tc.function) || {};
+                    var args = fn.arguments;
+                    accumulateToolCall(
+                        Object.keys(toolCallsAccum).length,
+                        tc && tc.id ? tc.id : '',
+                        fn.name,
+                        typeof args === 'string' ? args : JSON.stringify(args || {})
+                    );
+                });
+            }
+            if (j.done) {
+                if (typeof j.prompt_eval_count === 'number' || typeof j.eval_count === 'number') {
+                    usageInfo = { prompt_tokens: j.prompt_eval_count || 0, completion_tokens: j.eval_count || 0 };
+                }
+                finish();
+            }
+        }
+
+        function handleStreamLine(rawLine) {
+            var line = String(rawLine || '').trim();
+            if (!line) return;
+            // Ollama 是换行分隔的 JSON（NDJSON），没有 SSE 的 data: 前缀
+            if (apiFormat === 'ollama') {
+                try { handleOllamaChunk(JSON.parse(line)); } catch (e) {}
+                return;
+            }
+            if (line.indexOf('data:') !== 0) return; // Anthropic 的 event: / id: 行
+            var payload = line.slice(5).trim();
+            if (!payload) return;
+            if (payload === '[DONE]') { finish(); return; }
+            var parsed;
+            try { parsed = JSON.parse(payload); } catch (e) { return; }
+            if (apiFormat === 'anthropic') handleAnthropicEvent(parsed);
+            else handleOpenAIChunk(parsed);
+        }
 
         aiFetch(endpoint, {
             method: 'POST',
-            headers: fetchHeaders,
+            headers: buildAuthHeaders(apiFormat, currentConfig.apiKey),
             body: JSON.stringify(body),
             signal: abortController.signal
         }).then(function(resp) {
             if (!resp.ok) return resp.json().catch(function() { return {}; }).then(function(e) {
                 //带上 HTTP 状态码，断连重试要靠它区分瞬时故障（5xx/429）和明确拒绝（4xx）
-                var httpErr = new Error(e.error ? e.error.message : 'HTTP ' + resp.status);
+                var httpErr = new Error((e.error && (e.error.message || e.error.type)) || 'HTTP ' + resp.status);
                 httpErr.status = resp.status;
                 throw httpErr;
             });
@@ -12163,83 +13850,41 @@
                 htmlErr.noRetry = true;
                 throw htmlErr;
             }
-            if (/json/i.test(respCT)) {
+            // Ollama 的流式响应是 application/x-ndjson，不能按 application/json 判错
+            if (apiFormat !== 'ollama' && /^application\/json/i.test(respCT)) {
                 return resp.json().catch(function() { return {}; }).then(function(e) {
                     var jsonMsg = (e && e.error && ((e.error.message || e.error.type) || JSON.stringify(e.error))) || '';
-                    var jsonErr = new Error(jsonMsg || '端点返回了 JSON 而非 SSE 流（HTTP 200），请核对接口地址（如 https://主机名/v1/chat/completions）');
+                    var jsonErr = new Error(jsonMsg || '端点返回了 JSON 而非 SSE 流（HTTP 200），请核对接口地址与 API 格式（OpenAI / Anthropic / Ollama）');
                     jsonErr.noRetry = true;
                     throw jsonErr;
                 });
             }
-            var reader = resp.body.getReader();
+            streamReader = resp.body.getReader();
             var decoder = new TextDecoder();
             var buf = '';
             function read() {
-                reader.read().then(function(r) {
+                if (finished || !streamReader) return;
+                streamReader.read().then(function(r) {
+                    if (finished) return;
                     if (r.done) { finish(); return; }
                     buf += decoder.decode(r.value, { stream: true });
                     var lines = buf.split('\n');
                     buf = lines.pop() || '';
-                    lines.forEach(function(l) {
-                        l = l.trim();
-                        if (!l || !l.startsWith('data: ')) return;
-                        var d = l.slice(6);
-                        if (d === '[DONE]') { finish(); return; }
-                        try {
-                            var j = JSON.parse(d);
-                            // usage 分片可能单独到达（此时 choices 为空数组），要先取
-                            if (j.usage) usageInfo = j.usage;
-                            var delta = j.choices && j.choices[0] && j.choices[0].delta;
-                            if (!delta) return;
-                            if (delta.reasoning_content) {
-                                fullReasoning += delta.reasoning_content;
-                            }
-                            if (delta.content) {
-                                fullContent += delta.content;
-                            }
-                            if (delta.tool_calls) {
-                                delta.tool_calls.forEach(function(tc) {
-                                    if (!toolCallsAccum[tc.index]) {
-                                        toolCallsAccum[tc.index] = { id: tc.id || '', type: tc.type || 'function', function: { name: '', arguments: '' } };
-                                    }
-                                    if (tc.id) toolCallsAccum[tc.index].id = tc.id;
-                                    if (tc.function) {
-                                        if (tc.function.name) toolCallsAccum[tc.index].function.name = tc.function.name;
-                                        if (tc.function.arguments) toolCallsAccum[tc.index].function.arguments += tc.function.arguments;
-                                    }
-                                });
-                                hasToolCall = true;
-                            }
-                        } catch(e) {}
-                    });
+                    for (var i = 0; i < lines.length && !finished; i++) {
+                        handleStreamLine(lines[i]);
+                    }
+                    if (finished) return;
                     callback({ type: 'chunk', fullContent: fullContent, fullReasoning: fullReasoning });
                     read();
                 }).catch(function(err) {
+                    if (finished) return;
                     callback({ type: 'error', error: err });
                 });
             }
             read();
         }).catch(function(err) {
-            callback({ type: 'error', error: err });
+            abortWithError(err);
         });
-
-        var finished = false;
-        function finish() {
-            if (finished) return;
-            finished = true;
-            recordUsage(usageInfo, inputTokens);
-            if (hasToolCall && Object.keys(toolCallsAccum).length > 0) {
-                var toolCalls = [];
-                Object.keys(toolCallsAccum).sort().forEach(function(k) {
-                    toolCalls.push(toolCallsAccum[k]);
-                });
-                callback({ type: 'tool_calls', toolCalls: toolCalls, content: fullContent, reasoning: fullReasoning });
-            } else {
-                callback({ type: 'text', content: fullContent, reasoning: fullReasoning });
-            }
-        }
-
-        var usageInfo = null;
     }
 
     // sourceHistory 可选：生成回合续跑时传本回合所属会话的消息，防止用户
@@ -12306,23 +13951,52 @@
         try {
             var provider = PROVIDERS[currentConfig.provider];
             if (!provider) return;
-            var endpoint = provider.isCustom ? normalizeCustomEndpoint(currentConfig.customEndpoint || provider.endpoint) : provider.endpoint;
+            var apiFormat = getApiFormat();
+            var endpoint = resolveEndpoint();
+            if (!endpoint) return;
+            var titlePrompt = '根据用户的消息生成一个简短的对话标题，不超过12个字，直接返回标题文本，不要引号不要解释。';
+            var titleSeed = String(firstMessage || '').slice(0, 500);
             var titleMessages = [
-                { role: 'system', content: '根据用户的消息生成一个简短的对话标题，不超过12个字，直接返回标题文本，不要引号不要解释。' },
-                { role: 'user', content: String(firstMessage || '').slice(0, 500) }
+                { role: 'system', content: titlePrompt },
+                { role: 'user', content: titleSeed }
             ];
-            var body = { model: getEffectiveModelId(), messages: titleMessages, stream: false, max_tokens: 50 };
-            var headers = { 'Content-Type': 'application/json' };
-            headers['Authorization'] = 'Bearer ' + currentConfig.apiKey;
+            var body;
+            if (apiFormat === 'anthropic') {
+                // Anthropic 的 system 是顶层字段，且 max_tokens 必填
+                body = {
+                    model: getEffectiveModelId(),
+                    max_tokens: 64,
+                    system: titlePrompt,
+                    messages: [{ role: 'user', content: titleSeed }]
+                };
+            } else if (apiFormat === 'ollama') {
+                body = {
+                    model: getEffectiveModelId(),
+                    messages: titleMessages,
+                    stream: false,
+                    options: { num_predict: 64 }
+                };
+            } else {
+                body = { model: getEffectiveModelId(), messages: titleMessages, stream: false, max_tokens: 50 };
+            }
             aiFetch(endpoint, {
                 method: 'POST',
-                headers: headers,
+                headers: buildAuthHeaders(apiFormat, currentConfig.apiKey),
                 body: JSON.stringify(body)
             }).then(function(resp) {
-                if (!resp.ok) return resp.json().catch(function() { return {}; }).then(function(e) { throw new Error(e.error ? e.error.message : 'HTTP ' + resp.status); });
+                if (!resp.ok) return resp.json().catch(function() { return {}; }).then(function(e) { throw new Error((e.error && (e.error.message || e.error.type)) || 'HTTP ' + resp.status); });
                 return resp.json();
             }).then(function(data) {
-                var title = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+                var title = '';
+                if (data) {
+                    if (apiFormat === 'anthropic') {
+                        title = (data.content && data.content[0] && data.content[0].text) || '';
+                    } else if (apiFormat === 'ollama') {
+                        title = (data.message && data.message.content) || '';
+                    } else {
+                        title = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+                    }
+                }
                 if (!title) return;
                 title = String(title).trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').slice(0, 12);
                 if (!title) return;
@@ -12352,7 +14026,7 @@
             var remoteText = messageInput.value.trim();
             var remoteImages = pendingImages.slice();
             if (!remoteText && !remoteImages.length) return;
-            if (!currentConfig.apiKey) { showToast(t('configureApiKeyFirst'), 'error'); return; }
+            if (configNeedsApiKey() && !currentConfig.apiKey) { showToast(t('configureApiKeyFirst'), 'error'); return; }
             messageInput.value = '';
             autoResize();
             pendingImages = [];
@@ -12379,6 +14053,8 @@
         }
 
         if (isInitial) {
+            // 新一轮提问：本轮用量与计时都从这里重新起算
+            resetTurnUsage();
             var conv = isSynthetic
                 ? conversations.find(function(c) { return c.id === (synthetic.convId || activeConversationId); })
                 : getActiveConv();
@@ -12393,7 +14069,7 @@
             } else {
                 content = messageInput.value.trim();
                 if (!content && pendingImages.length === 0 && pendingFiles.length === 0) return;
-                if (!currentConfig.apiKey) { showToast('Configure API Key first', 'error'); openSettings(); return; }
+                if (configNeedsApiKey() && !currentConfig.apiKey) { showToast(t('configureApiKeyFirst'), 'error'); openSettings(); return; }
                 images = pendingImages.slice();
                 displayContent = content;
 
@@ -12685,6 +14361,53 @@
                         // 服务端明确拒绝（密钥无效、请求非法等）：重试无意义，直接呈现报错
                         finishWithError(result.error.message || String(result.error), false);
                     }
+                } else if (result.type === 'loop') {
+                    // 幻觉/循环输出：模型把同一文段连续输出了 10 次。已经烧掉的
+                    // token 收不回来，这里立刻结束本回合（不重试、不续跑工具循环），
+                    // 把已产出的内容如实留档，并明确告知用户对话已暂停。
+                    streamSettled = true;
+                    clearStreamRetry();
+                    var loopTypingEl = document.getElementById('typingIndicator');
+                    if (loopTypingEl) loopTypingEl.remove();
+                    if (activeProcessBody) {
+                        activeProcessBody.querySelectorAll('.reasoning-box.is-streaming').forEach(function(el) {
+                            el.classList.remove('is-streaming');
+                            var rc = el.querySelector('.reasoning-content');
+                            if (rc) rc.classList.remove('streaming');
+                        });
+                    }
+                    finalizeProcessGroup();
+                    turnHasStreamOutput = true;
+
+                    var loopContent = result.content || '';
+                    // 重复段落可能很长，留档时截断，避免污染下一轮的上下文预算
+                    var loopStored = loopContent.length > 6000
+                        ? loopContent.slice(0, 6000) + '\n\n…（重复内容已截断）'
+                        : loopContent;
+                    var loopVisible = isGeneratingConvVisible();
+                    if (loopStored.trim()) {
+                        streamingWrapper.id = '';
+                        if (loopVisible) {
+                            if (streamingWrapper.parentNode !== chatArea) chatArea.appendChild(streamingWrapper);
+                            streamingBubble.innerHTML = formatMarkdown(loopStored) + '<div class="message-time">' + formatTime(new Date()) + '</div>';
+                        }
+                        pushGeneratingMessage({ role: 'assistant', content: loopStored, time: formatTime(new Date()), reasoning: result.reasoning || undefined });
+                    } else {
+                        streamingWrapper.remove();
+                    }
+
+                    // 暂停提示单独成条：不参与后续请求，只作为用户可见说明
+                    var loopNotice = t('loopDetected');
+                    var loopNoticeMsg = { role: 'assistant', content: loopNotice, time: formatTime(new Date()) };
+                    isLoading = false;
+                    abortController = null;
+                    pushGeneratingMessage(loopNoticeMsg);
+                    if (isGeneratingConvVisible()) appendAIMessage(loopNotice, loopNoticeMsg.time, '', [], true);
+                    setGeneratingConv(null);
+                    notifySidebarTodoTurnEnd();
+                    phoneClearStream();
+                    phonePushHistory();
+                    if (isGeneratingConvVisible() || loopVisible) scrollToBottom();
                 } else if (result.type === 'tool_calls') {
                     streamingWrapper.remove();
                     turnHasStreamOutput = true;
@@ -12810,6 +14533,8 @@
                     }
                     // 本回合的最终总结：先收起过程分组，再把 Token 用量挂到总结底部
                     streamingWrapper.id = '';
+                    // 用量与计时由 doApiCall 在流收尾时定格，这里只负责展示与存档
+                    var turnStats = result.turnUsage || null;
                     var summaryVisible = isGeneratingConvVisible();
                     if (summaryVisible) {
                         var finalTypingEl = document.getElementById('typingIndicator');
@@ -12824,10 +14549,17 @@
                         // 重新挂回末尾，否则最终回答留在 detach 节点上看不见
                         if (streamingWrapper.parentNode !== chatArea) chatArea.appendChild(streamingWrapper);
                         streamingBubble.innerHTML = formatMarkdown(result.content) + '<div class="message-time">' + formatTime(new Date()) + '</div>';
-                        renderSummaryFooter(streamingWrapper, currentRequestTokens);
+                        renderSummaryFooter(streamingWrapper, currentRequestTokens, turnStats);
                     }
 
-                    var aiMsg = { role: 'assistant', content: result.content, time: formatTime(new Date()), reasoning: result.reasoning || undefined };
+                    var aiMsg = {
+                        role: 'assistant',
+                        content: result.content,
+                        time: formatTime(new Date()),
+                        reasoning: result.reasoning || undefined,
+                        // 随消息存档：切走再切回、重启后历史重放仍能还原本轮用量与用时
+                        turnUsage: turnStats || undefined
+                    };
                     pushGeneratingMessage(aiMsg);
                     isLoading = false;
                     abortController = null;
@@ -13278,7 +15010,6 @@
     var phoneClientDot = document.getElementById('phoneClientDot');
     var phoneClientText = document.getElementById('phoneClientText');
     var phoneLinkOpen = false;
-    var phoneLinkLoaded = false;
     var phoneLastStreamPush = 0;
     var phoneStreamTimer = 0;
     var phoneStreamState = null;
@@ -13331,7 +15062,7 @@
             locale: currentLocale,
             undo: (function() {
                 var u = currentUndoState();
-                return u ? { snapshotId: u.snapshotId, capturedAt: u.capturedAt, undone: !!u.undone } : null;
+                return u ? { count: u.count || 0, undone: !!u.undone } : null;
             })(),
             conversations: conversations.map(function(c) {
                 return {
@@ -13443,7 +15174,7 @@
                 }) : [];
                 if (!text && !images.length) return { ok: false, error: '消息为空' };
                 if (isLoading) return { ok: false, error: '电脑端正在生成，请稍候' };
-                if (!currentConfig.apiKey) return { ok: false, error: t('configureApiKeyFirst') };
+                if (configNeedsApiKey() && !currentConfig.apiKey) return { ok: false, error: t('configureApiKeyFirst') };
                 if (phoneLinkOpen) togglePhonePopover(false);
                 messageInput.value = text;
                 pendingImages = images;
@@ -13504,7 +15235,7 @@
             }
             case 'undoChanges': {
                 var undoState = currentUndoState();
-                if (!undoState || !undoState.snapshotId) return { ok: false, error: '本次对话没有可撤销的更改' };
+                if (!undoState || (!undoState.undone && !undoState.count)) return { ok: false, error: '本次对话没有可撤销的更改' };
                 if (undoState.undone) return { ok: false, error: '更改已经撤销过了' };
                 if (isLoading) return { ok: false, error: '电脑端正在生成，请稍候' };
                 // 手机上已经确认过一次，这里直接执行，不在电脑端再弹一次确认框
@@ -13560,11 +15291,12 @@
                 if (!window.AIAssistantPreload) return { ok: false, error: 'Preload 不可用' };
                 var json;
                 try { json = JSON.parse(String(msg.projectJSON || '')); } catch (e) { return { ok: false, error: '工程 JSON 无效' }; }
-                window.AIAssistantPreload.applyProject(json).then(function(r) {
+                window.AIAssistantPreload.applyProject(json, activeConversationId || 'default').then(function(r) {
                     phonePush('toast', {
                         message: r && r.success ? '工程已在电脑端应用' : '应用失败',
                         type: r && r.success ? 'success' : 'error'
                     });
+                    if (r && r.success) refreshUndoStatus();
                 });
                 return { ok: true };
             }
@@ -13597,7 +15329,7 @@
         // 撤销状态由电脑端持有，挂到当前会话上，渲染脚注时才知道要不要出按钮
         var remoteActive = conversations.find(function(c) { return c.id === activeConversationId; });
         if (remoteActive) {
-            if (snap.undo && snap.undo.snapshotId) remoteActive.undo = snap.undo;
+            if (snap.undo && (snap.undo.count || snap.undo.undone)) remoteActive.undo = snap.undo;
             else delete remoteActive.undo;
         }
         // 侧边栏待办面板跟随桌面快照（只镜像当前会话）
@@ -13725,7 +15457,8 @@
         phonePopover.classList.toggle('open', phoneLinkOpen);
         if (phoneLinkBtn) phoneLinkBtn.classList.toggle('active', phoneLinkOpen);
         if (!phoneLinkOpen) return;
-        if (phoneLinkLoaded) return;
+        // 每次打开都取新连接信息：二维码里的配对码短时效且随打开而换新，
+        // 旧的作废，泄露面始终只有"此刻屏幕上这一个"
         phoneQrBox.innerHTML = '<div class="phone-qr-empty">…</div>';
         if (!window.AIAssistantPreload || !window.AIAssistantPreload.getPhoneLink) {
             phoneQrBox.innerHTML = '<div class="phone-qr-empty">' + escapeHtml(t('phoneServerOff')) + '</div>';
@@ -13736,7 +15469,6 @@
                 phoneQrBox.innerHTML = '<div class="phone-qr-empty">' + escapeHtml(t('phoneServerOff')) + '</div>';
                 return;
             }
-            phoneLinkLoaded = true;
             var url = (info.urls && info.urls[0]) || '';
             renderPhoneQr(url);
             renderPhoneUrls(info.urls || []);
@@ -13767,7 +15499,7 @@
     init();
     updateSendBtn();
     populateModelSwitcherDropdown();
-    if (!currentConfig.apiKey) setTimeout(function() { settingDot.classList.add('visible'); }, 500);
+    if (configNeedsApiKey() && !currentConfig.apiKey) setTimeout(updateSettingDot, 500);
 })();
 </script>
 </body>

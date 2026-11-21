@@ -2020,10 +2020,20 @@
         fire('ai-tool-call', payload);
       });
     };
+    // 项目分析/AI 取码依赖 editor GUI 先注册 onRequestProjectJSON。若请求早于
+    // 监听注册到达（例如从主页打开项目分析浮窗时 editor 仍在加载工程），fire
+    // 会落进空的 deliverQueue 而永久丢失 → 30s 超时返回 null → 页面显示
+    // 「无法获取项目数据」错误。这里把未派发的请求暂存，注册监听时再 flush。
+    var deferredProjectJSON = [];
     editorRequests['project-json'] = function (payload) {
       return new Promise(function (resolve) {
         pendingProjectJSONReply[payload && payload.requestId] = resolve;
-        fire('request-project-json', payload);
+        var list = deliverQueue['request-project-json'];
+        if (list && list.length) {
+          fire('request-project-json', payload);
+        } else {
+          deferredProjectJSON.push(payload);
+        }
       });
     };
     editorRequests['sprite-library'] = function (payload) {
@@ -2223,7 +2233,14 @@
     openProjectAnalysis: function () { return inv('openWindow', { type: 'project-analysis' }); },
     openTaskManager: function () { return inv('openWindow', { type: 'task-manager' }); },
     openMobilePreview: function () { return inv('openWindow', { type: 'mobile-preview' }); },
-    onRequestProjectJSON: function (callback) { deliverQueue['request-project-json'] = [callback]; },
+    onRequestProjectJSON: function (callback) {
+      deliverQueue['request-project-json'] = [callback];
+      // flush 监听注册前暂存的取码请求（见 deferredProjectJSON 注释）
+      var pending = deferredProjectJSON.splice(0);
+      for (var i = 0; i < pending.length; i++) {
+        try { callback(pending[i]); } catch (e) { console.error(e); }
+      }
+    },
     sendProjectJSON: function (data) {
       // 兼容两种路径：hub 请求（requestId 关联）或直接推送
       for (var k in pendingProjectJSONReply) {
@@ -2581,6 +2598,20 @@
       getSpriteLibrary: function () { return inv('requestEditorSpriteLibrary'); },
       getModelConfigs: function () { return inv('getAiModelConfigs'); },
       saveModelConfigs: function (payload) { return inv('saveAiModelConfigs', { payload: payload }); },
+      // 2.4.0 AI 请求代理令牌：Android 的 /__fetch/ 代理无需鉴权，返回占位即可；
+      // 新版 ai-assistant.html 的 aiFetch 必需此方法，缺失会回退直连被 CORS 拦截。
+      getAiProxyToken: function () { return Promise.resolve('android-local-proxy'); },
+      // 2.4.0 导出对话 JSONL：复用 extSaveAs 的文本 SAF 保存通道。
+      exportConversationJsonl: function (payload) {
+        var p = payload || {};
+        return inv('extSaveAs', {
+          suggestedName: p.defaultName || 'conversation.jsonl',
+          content: String(p.content || '')
+        }).then(function (r) {
+          if (r && r.path) return { success: true, path: r.path };
+          return { success: false, canceled: true };
+        }).catch(function () { return { success: false }; });
+      },
       // 2.3.0 AI 工作流设置
       getSettings: function () { return inv('aiGetSettings'); },
       saveSettings: function (payload) { return inv('aiSaveSettings', payload || {}); },
