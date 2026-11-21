@@ -140,6 +140,10 @@ public class BridgeHub {
     private final Map<String, Object[]> exportBuffers = new ConcurrentHashMap<>(); // requestId -> {name, baos, total, count}
     private final Map<String, Object[]> uploadBuffers = new ConcurrentHashMap<>(); // key -> {baos, meta}
 
+    // 编辑器最近一次上报的项目数据快照。项目分析/AI 取码优先读此缓存，
+    // 避免依赖跨窗口 evaluateJs 的实时中转（editor 后台/未就绪时该链路易超时）。
+    private volatile String cachedProjectJSON = null;
+
     private Uri pendingInitialFile = null;
 
     /* CPU 采样 */
@@ -871,6 +875,18 @@ public class BridgeHub {
             }
             case "requestEditorProjectData": {
                 requestEditor(winType, "project-json", new JSONObject(), cbId, 30000);
+                return;
+            }
+            /* editor 主动上报项目数据快照（项目加载/变更时），供项目分析无跨窗口依赖地读取 */
+            case "cacheProjectData": {
+                String data = args.optString("data", null);
+                if (data != null && data.length() > 0) cachedProjectJSON = data;
+                reply(cbId, ok());
+                return;
+            }
+            /* 项目分析优先读缓存；无缓存返回 null，由 JS 侧 fallback 到 requestEditorProjectData */
+            case "getCachedProjectData": {
+                reply(cbId, cachedProjectJSON == null ? jstr(null) : cachedProjectJSON);
                 return;
             }
             case "webSearch": {

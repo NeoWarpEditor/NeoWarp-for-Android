@@ -2240,8 +2240,17 @@
       for (var i = 0; i < pending.length; i++) {
         try { callback(pending[i]); } catch (e) { console.error(e); }
       }
+      // 监听注册后主动采集一次项目数据快照到 Java 缓存，供项目分析/AI 无跨窗口依赖地读取。
+      // 工程可能仍在加载，延迟两轮确保 vm 就绪；失败也无妨（Java 仅在拿到有效数据时缓存）。
+      setTimeout(function () {
+        try { fire('request-project-json', { requestId: '__cache__' }); } catch (e) {}
+      }, 1200);
     },
     sendProjectJSON: function (data) {
+      // 上报项目数据快照到 Java 缓存（项目分析优先读缓存，绕开跨窗口 evaluateJs 时序问题）
+      if (java && data && data.projectJSON) {
+        try { java.rpcAsync(WIN_TYPE, 'cacheProjectData', JSON.stringify({ data: JSON.stringify(data) }), 'cb-cache-' + (cbSeq++)); } catch (e) {}
+      }
       // 兼容两种路径：hub 请求（requestId 关联）或直接推送
       for (var k in pendingProjectJSONReply) {
         pendingProjectJSONReply[k](data);
@@ -2373,7 +2382,9 @@
       openCollabHostFromFile: function () { return inv('collabOpenSb3'); },
       openImageEditor: function () { return inv('openWindow', { type: 'image-editor' }); },
       openSettings: function () { return inv('openWindow', { type: 'desktop-settings' }); },
-      openSolo: function () { return inv('openWindow', { type: 'ai-assistant', payload: { solo: true } }); },
+      // SOLO 必须开 "solo" 类型：URL 带 ?nwwin=solo → WIN_TYPE='solo' → 注入 SoloPreload（IS_SOLO=true），
+      // 且 solo 不在浮动窗口列表 → 全屏。之前误用 ai-assistant 类型导致普通 AI 小窗。
+      openSolo: function () { return inv('openWindow', { type: 'solo' }); },
       getRecentProjects: function () { return inv('getRecentProjects'); },
       openRecentProject: function (filePath) { return inv('openRecentProject', { path: filePath }); },
       onRecentChanged: function (callback) { on('home', 'recent-changed', callback); }
@@ -2510,7 +2521,13 @@
 
   if (WIN_TYPE === 'project-analysis') {
     window.ProjectAnalysisPreload = {
-      getProjectData: function () { return inv('requestEditorProjectData'); },
+      // 优先读 editor 上报的 Java 缓存（不依赖跨窗口 evaluateJs 时序）；无缓存时回退到实时请求。
+      getProjectData: function () {
+        return inv('getCachedProjectData').then(function (cached) {
+          if (cached && cached.projectJSON) return cached;
+          return inv('requestEditorProjectData');
+        });
+      },
       getTheme: function () { return inv('getTheme'); },
       closeWindow: function () { return inv('closeWindow'); },
       saveImage: function (dataUrl) {
