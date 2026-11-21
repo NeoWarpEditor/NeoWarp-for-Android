@@ -2097,26 +2097,34 @@
     sendAIListenersReady: function () { return inv('aiListenersReady'); },
     onImportCostume: function (cb) { on('editor', 'import-costume', cb); },
     sendImportCostumeResult: function (data) { return inv('importCostumeResult', data || {}); },
-    /* 「新窗口」改为「当前页面新建项目」：不再另开 Android Activity，
-       直接走 scratch-gui 的 new-project action，与当前编辑器实例共用同一页面。
-       START_FETCHING_NEW 等价于菜单 File→New（不需要先保存的场景），会重新
-       拉取默认空白项目并复位项目状态。 */
+    /* 「新窗口」= 在当前页面新建项目：走 scratch-gui 的 new-project action，
+       与当前编辑器实例共用同一页面，绝不另开 Android Activity。
+       START_FETCHING_NEW 等价于菜单 File→New（不需要先保存的场景），reducer
+       把 loadingState 置为 FETCHING_NEW_DEFAULT、projectId 置为默认 '0'，
+       fetcher 随即从本地内置存储拉取空白项目。 */
     newProject: function () {
-      var store = window.ReduxStore;
-      if (!store || typeof store.dispatch !== 'function') return false;
-      try {
-        // reducer 会把 loadingState 置为 FETCHING_NEW_DEFAULT 并把 projectId
-        // 设为 defaultProjectId，fetcher 随即拉取默认空白项目——不要再手动
-        // 改 projectId，否则会覆盖 reducer 刚设好的默认 id。
-        store.dispatch({ type: 'scratch-gui/project-state/START_FETCHING_NEW' });
-        return true;
-      } catch (e) { return false; }
+      function dispatchNew() {
+        var store = window.ReduxStore;
+        if (!store || typeof store.dispatch !== 'function') return false;
+        try {
+          // 不要手动改 projectId，否则会覆盖 reducer 刚设好的默认 id。
+          store.dispatch({ type: 'scratch-gui/project-state/START_FETCHING_NEW' });
+          return true;
+        } catch (e) { return false; }
+      }
+      if (dispatchNew()) return true;
+      // store 尚未就绪或 dispatch 异常：延迟重试若干次，覆盖启动初期的竞态。
+      // 关键：无论成功与否都绝不再调用 Java openNewWindow 去开新 Activity。
+      var tries = 0;
+      var timer = setInterval(function () {
+        tries += 1;
+        if (dispatchNew() || tries >= 10) clearInterval(timer);
+      }, 120);
+      return true;
     },
     openNewWindow: function () {
-      var ok = this.newProject();
-      if (ok) return true;
-      // Redux 尚未就绪时兜底：仍尝试开新窗口，避免按钮完全无响应
-      return inv('openNewWindow', { type: 'editor' });
+      // 永远在当前页面新建项目，不再开新窗口（与当前项目相互独立）。
+      return this.newProject();
     },
     openAddonSettings: function (search) { return inv('openWindow', { type: 'addons', search: search || '' }); },
     openPackager: function () { return inv('openWindow', { type: 'packager' }); },
