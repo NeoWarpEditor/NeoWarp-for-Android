@@ -2315,7 +2315,19 @@
       document.querySelector('.detail-back-label').textContent =
         strings['desktop-settings.title'] || '设置';
 
-      function enterDetail (item) {
+      // 是否处于二级配置页（供系统手势返回 / popstate 判定）。
+      // 进入二级页时压一条 history，系统返回会触发 WebView.goBack -> popstate，
+      // 从而回到设置目录页，而不是直接 finish Activity 回到主页。
+      let inDetail = false;
+
+      function renderDirectory () {
+        document.body.classList.remove('nw-detail');
+        navItems.forEach((i) => i.classList.remove('selected'));
+        pages.forEach((p) => p.classList.remove('active'));
+        inDetail = false;
+      }
+
+      function enterDetail (item, fromPopstate) {
         const id = item.dataset.page;
         navItems.forEach((other) => other.classList.toggle('selected', other === item));
         pages.forEach((page) => page.classList.toggle('active', page.dataset.page === id));
@@ -2323,15 +2335,31 @@
         document.body.classList.add('nw-detail');
         content.scrollTop = 0;
         if (id === 'storage' && typeof loadStorage === 'function') loadStorage();
+        if (!fromPopstate) {
+          inDetail = true;
+          try { history.pushState({ nwSettingsDetail: id }, '', '#' + id); } catch (e) {}
+        }
       }
       navItems.forEach((item) => {
-        item.addEventListener('click', () => enterDetail(item));
+        item.addEventListener('click', () => enterDetail(item, false));
       });
       detailBack.addEventListener('click', () => {
-        document.body.classList.remove('nw-detail');
-        navItems.forEach((i) => i.classList.remove('selected'));
-        pages.forEach((p) => p.classList.remove('active'));
+        if (inDetail) {
+          // 有我们压入的历史项，回退让它走 popstate 统一收尾
+          try { history.back(); } catch (e) { renderDirectory(); }
+        } else {
+          renderDirectory();
+        }
       });
+      // 系统手势返回 / WebView.goBack 都会触发 popstate：
+      // 若仍在二级页，则退回设置目录页（而不是交给 Java 关闭窗口）。
+      window.addEventListener('popstate', () => {
+        if (document.body.classList.contains('nw-detail')) {
+          renderDirectory();
+        }
+      });
+      // 供宿主在保留目录页的前提下清空二级页状态
+      window.__nwSettingsResetDetail = renderDirectory;
 
       // ===== Storage 储存空间分析 =====
       (function initStorage () {

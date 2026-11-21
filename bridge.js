@@ -310,6 +310,12 @@
         // 右下角悬浮按钮与提示气泡避让手势条
         css += '#github-button,#settings-button{bottom:calc(26px + var(--nw-sab)) !important}'
           + '#toast{bottom:calc(48px + var(--nw-sab)) !important}';
+        // 顶部状态栏适配：竖屏下主页内容(Logo+问候+按钮)高于可视区时，
+        // 原本 justify-content:center 会把顶部 Logo 顶出屏幕外被裁切。
+        // 改为顶部对齐，让内容从安全区下方开始，多余部分靠 container 自身滚动。
+        css += '@media (max-width:900px){'
+          + '.container{justify-content:flex-start !important}'
+          + '}';
       }
       if (WIN_TYPE === 'image-editor') {
         // 竖屏适配：菜单栏单行横排可滚动（此前 8 个菜单项被压成一字一行竖排）、
@@ -396,17 +402,20 @@
           + '@keyframes nw-root-in{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}'
           + '@media (prefers-reduced-motion:reduce){'
           + 'body.nw-detail .content,body:not(.nw-detail) .sidebar{animation:none !important}}';
-        // 竖屏适配：主页 logo 行的控件区含图片预览 + HTML预览 + 两个按钮，
-        // 加上 flex-shrink:0 会在窄屏把左侧标题挤成竖排单字，故整行改为纵向堆叠
+        // 竖屏适配：每个设置项保持「左侧文字 / 右侧配置控件」的横向单行布局，
+        // 不再把文字与控件拆成多行。控件区允许内部折行以容纳多个按钮，但整体靠右。
         css += '@media (max-width:620px){'
-          + '.setting-row{flex-wrap:wrap;align-items:flex-start;row-gap:8px}'
-          + '.setting-row .setting-info{flex:1 1 100%;min-width:0}'
-          + '.setting-row .setting-control{flex:1 1 100%;width:100%;flex-wrap:wrap;gap:8px}'
+          + '.setting-row{flex-wrap:nowrap !important;align-items:center !important;row-gap:0;padding:10px 14px}'
+          + '.setting-row .setting-info{flex:1 1 auto;min-width:0}'
+          + '.setting-row .setting-desc{font-size:11px;line-height:1.35;max-width:100%}'
+          + '.setting-row .setting-control{flex:0 1 auto;min-width:0;max-width:58%;'
+          + 'flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-left:8px}'
           + '.setting-row .setting-control>*{flex:0 0 auto}'
-          + '.home-text-input{width:100% !important;flex:1 1 auto !important}'
-          + '.home-logo-preview,.home-logo-html-preview{margin-right:0}'
-          + '.setting-row + .setting-row::before{left:16px}'
-          + '.setting-label{word-break:keep-all;overflow-wrap:normal}'
+          + '.home-text-input{width:120px !important;flex:0 1 auto !important;min-width:0}'
+          + '.home-logo-preview,.home-logo-html-preview{margin-right:0;width:34px;height:34px}'
+          + '.setting-row + .setting-row::before{left:14px}'
+          + '.setting-label{word-break:keep-all;overflow-wrap:normal;font-size:14px}'
+          + '.row-icon{margin-right:10px}'
           + '}';
       }
       var st = document.createElement('style');

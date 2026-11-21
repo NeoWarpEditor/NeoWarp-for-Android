@@ -12,6 +12,8 @@
       saveAs: '另存为',
       addToProject: '添加到项目',
       addToMyExtensions: '添加到我的扩展',
+      addTo: '添加到',
+      openFrom: '从打开',
       updateMyExtensions: '更新我的扩展',
       addedToMyExtensions: '已添加到我的扩展',
       updatedToMyExtensions: '我的扩展已更新',
@@ -72,6 +74,8 @@
       saveAs: 'Save As',
       addToProject: 'Add to Project',
       addToMyExtensions: 'Add to My Extensions',
+      addTo: 'Add to',
+      openFrom: 'Open',
       updateMyExtensions: 'Update My Extension',
       addedToMyExtensions: 'Added to My Extensions',
       updatedToMyExtensions: 'My Extension updated',
@@ -477,6 +481,9 @@
     $('btn-save').title = strings.save + ' (Ctrl+S)';
     $('btn-save-as').title = strings.saveAs + ' (Ctrl+Shift+S)';
     $('btn-new-tab').title = strings.newTab;
+    $('dd-add-label').textContent = strings.addTo;
+    $('dd-save-label').textContent = strings.save;
+    $('btn-open-file-label').textContent = strings.openFrom;
     $('btn-open-file').title = strings.openFiles;
     $('ai-popout-btn').title = strings.popout;
     $('activity-ai').title = 'AI';
@@ -525,6 +532,10 @@
         automaticLayout: true,
         fontSize: 14,
         fontFamily: 'Consolas, "Courier New", monospace',
+        lineNumbersMinChars: 2,
+        lineDecorationsWidth: 4,
+        glyphMargin: false,
+        folding: false,
         tabSize: 2,
         insertSpaces: true,
         minimap: {enabled: true},
@@ -587,6 +598,35 @@
 
   $('btn-save').addEventListener('click', saveFile);
   $('btn-save-as').addEventListener('click', saveFileAs);
+
+  // ── 工具栏下拉菜单开关 ────────────────────────────────────
+  (function initToolbarDropdowns () {
+    var dds = Array.prototype.slice.call(document.querySelectorAll('.tb-dropdown'));
+    function closeAll (except) {
+      dds.forEach(function (d) { if (d !== except) d.classList.remove('open'); });
+    }
+    dds.forEach(function (dd) {
+      var trigger = dd.querySelector('.dd-trigger');
+      if (!trigger) return;
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var willOpen = !dd.classList.contains('open');
+        closeAll(dd);
+        dd.classList.toggle('open', willOpen);
+      });
+    });
+    // 点击任意菜单项后收起
+    document.querySelectorAll('.dd-item').forEach(function (item) {
+      item.addEventListener('click', function () { closeAll(null); });
+    });
+    // 点击空白处收起
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.tb-dropdown')) closeAll(null);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeAll(null);
+    });
+  })();
   $('btn-new-tab').addEventListener('click', function () {
     createTab({content: strings.newFileTemplate});
   });
@@ -599,6 +639,9 @@
     var has = !!(projects && projects.length);
     $('btn-add-to-project').classList.toggle('hidden', !has);
     $('btn-add-to-my-extensions').classList.toggle('hidden', !has);
+    // 没有可添加目标时，整个「添加到」下拉都收起，避免点出空菜单
+    var ddAdd = $('dd-add');
+    if (ddAdd) ddAdd.classList.toggle('hidden', !has);
   }
   P.listProjects().then(updateProjectButtons).catch(function () {});
   P.onProjectsChanged(updateProjectButtons);
