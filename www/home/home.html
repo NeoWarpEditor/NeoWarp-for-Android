@@ -172,6 +172,9 @@
         pointer-events: none;
         transition: background 0.3s ease;
       }
+      /* 浅色主题：主页背景图不叠加白色遮罩，保留图片原始色彩。
+         仅覆盖全屏 .bg-scrim 元素；液态玻璃 .lg-veil 仍使用 --bg-scrim 变量，不受影响。 */
+      html[data-theme="light"] .bg-scrim { background: transparent; }
 
       .container {
         position: relative;
@@ -609,12 +612,12 @@
         fill: currentColor;
       }
 
-      /* ===== "检测到新版本"胶囊（位于两枚圆按钮左侧） ===== */
+      /* ===== "检测到新版本"胶囊（左下角，与右下角圆按钮对称） ===== */
       #update-capsule {
         position: fixed;
         z-index: 2;
         bottom: 26px;
-        right: 146px;
+        left: 26px;
         height: 46px;
         padding: 0 18px 0 9px;
         border: 1px solid var(--card-border);
@@ -1751,10 +1754,11 @@
       // 叠加蒙层（--bg-scrim）后的平均亮度自动选择白字或黑字。
       const brandSampleCanvas = document.createElement('canvas');
 
-      // 与 CSS 中 --bg-scrim 保持一致
+      // 与 CSS 中 .bg-scrim 的实际遮罩保持一致：浅色主题已去掉白色遮罩（透明），
+      // 故按 alpha 0 采样原图亮度决定品牌字色，避免判定与实际背景不符
       function brandScrimColor() {
         return document.documentElement.getAttribute('data-theme') === 'light'
-          ? [242, 242, 247, 0.45]
+          ? [242, 242, 247, 0]
           : [10, 10, 13, 0.5];
       }
 

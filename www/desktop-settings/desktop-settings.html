@@ -1458,7 +1458,7 @@
       .detail-back {
         display: flex; align-items: center; gap: 2px; height: 44px;
         padding: 0 8px 0 4px; background: transparent;
-        color: var(--accent); font-size: 16px; font-weight: 400;
+        color: var(--text); font-size: 16px; font-weight: 400;
         border: none; outline: none;
         border-radius: 10px; cursor: pointer; flex-shrink: 0;
       }
@@ -1507,7 +1507,13 @@
       body.nw-detail .page.active .card:nth-child(2) { animation-delay: .04s; }
       body.nw-detail .page.active .card:nth-child(3) { animation-delay: .08s; }
       body.nw-detail .page.active .card:nth-child(4) { animation-delay: .12s; }
-      .detail-title { animation: nw-rise .34s var(--ease) .06s both; }
+      /* 标题居中靠 translateX(-50%) 实现，不能用 nw-rise（其 transform 会把
+         translateX(-50%) 覆盖成 none，导致标题偏右）。用仅动 opacity 的专用动画。 */
+      @keyframes nw-fade {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      .detail-title { animation: nw-fade .34s var(--ease) .06s both; }
       .detail-back:active { transform: scale(.94); }
       .detail-back { transition: transform .16s var(--ease), opacity .16s var(--ease); }
       /* 主题 / 配色切换：色彩变化平滑过渡 */

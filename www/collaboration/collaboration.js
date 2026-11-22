@@ -717,6 +717,9 @@
   Preload.onClientLeave(handleMemberLeft);
   if (Preload.onMemberJoined) Preload.onMemberJoined(handleMemberJoined);
   if (Preload.onMemberLeft) Preload.onMemberLeft(handleMemberLeft);
+  if (Preload.onPermissionDenied) Preload.onPermissionDenied(function (data) {
+    toast(data && data.message ? data.message : '项目更新被主机拒绝');
+  });
 
   Preload.onCollaborationEnded(function (data) {
     var reasons = {

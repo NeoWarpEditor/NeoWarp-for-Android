@@ -86,6 +86,17 @@ public class BridgeHub {
     private final List<NWActivity> windows = new ArrayList<>(); // UI 线程访问
     private final Map<String, String> windowPayloads = new ConcurrentHashMap<>(); // type -> payload json
 
+    /* ---------------- 协作会话（与桌面版协议互通） ----------------
+     * host / join 均持有网络引擎实例；网络线程回调经 evaluateJs 推事件到窗口。
+     * CollabEngine 本身线程安全，实例引用用 volatile 便于跨线程可见。 */
+    private volatile CollabEngine.Host collabHost;
+    private volatile CollabEngine.Join collabJoin;
+    private JSONObject collabPermissions = null;
+    private String collabHostName = "主机";
+    private String collabHostAvatar = "🏠";
+    /** host 模式下编辑器最新工程的权威载荷（{format:'sb3',data:...} JSON 字符串） */
+    private volatile String collabRoomProject = null;
+
     /* ---------------- 未保存状态（退出确认用） ---------------- */
     /** 各窗口是否有未保存改动，key = 窗口 Activity 实例 */
     private final Map<NWActivity, Boolean> dirtyWindows = new ConcurrentHashMap<>();
@@ -469,6 +480,13 @@ public class BridgeHub {
                    继续存活）。宿主已存在则只开 solo。 */
                 if ("solo".equals(type) && caller != null && BridgeHub.get(caller).getEditor() == null) {
                     WindowActivity.showSoloHost(caller);
+                }
+                /* 协作是浮动聊天窗，底层需要一个可见编辑器承载工程（权威源 /
+                   接收对端工程后 apply）。host-from-file 路径已单独拉起编辑器，
+                   这里覆盖 host-from-new 与 join：editor 不存在时补一个可见窗口。
+                   协作编辑器必须可见（不同于 SOLO 的透明宿主），用户要边看边改。 */
+                if ("collaboration".equals(type) && caller != null && getEditor() == null) {
+                    WindowActivity.show(caller, "editor", null);
                 }
                 if ("solo".equals(type) || "solo-stage".equals(type)) {
                     BridgeHub.get(caller).startSoloFramePump();
@@ -956,7 +974,7 @@ public class BridgeHub {
             }
             case "mobilePreviewQR": { reply(cbId, jstr(null)); return; }
 
-            /* ---------- 协作（桌面局域网特性，Android 降级） ---------- */
+            /* ---------- 协作（与桌面版局域网协议互通） ---------- */
             case "collabGetMode": {
                 String payload = windowPayloads.get(winType);
                 String mode = "host";
@@ -964,23 +982,72 @@ public class BridgeHub {
                 reply(cbId, jstr(mode));
                 return;
             }
-            case "collabGetLocalIP": { reply(cbId, jstr(null)); return; }
-            case "collabDiscover": { reply(cbId, "[]"); return; }
-            case "collabStartHost": case "collabJoin": {
-                JSONObject o = new JSONObject();
-                o.put("success", false);
-                o.put("error", "多人协作依赖桌面版局域网服务，Android 版暂不支持");
-                reply(cbId, o.toString());
+            case "collabGetLocalIP": { reply(cbId, jstr(localIP())); return; }
+            case "collabDiscover": {
+                final int port = args == null ? 8080 : args.optInt("port", 8080);
+                final String cb = cbId;
+                new Thread(() -> {
+                    try {
+                        JSONArray sessions = CollabEngine.discoverSessions(port);
+                        JSONObject r = new JSONObject().put("success", true).put("sessions", sessions);
+                        reply(cb, r.toString());
+                    } catch (Exception e) {
+                        try { reply(cb, new JSONObject().put("success", false).put("sessions", new JSONArray()).put("error", String.valueOf(e)).toString()); }
+                        catch (Exception ignored) {}
+                    }
+                }, "nw-collab-discover").start();
+                return;
+            }
+            case "collabStartHost": {
+                final String password = args == null ? "" : args.optString("password", "");
+                final int port = args == null ? 8080 : args.optInt("port", 8080);
+                final JSONObject perms = args == null ? null : args.optJSONObject("permissions");
+                final String nick = args == null ? "" : args.optString("nickname", "");
+                final String avatar = args == null ? "" : args.optString("avatar", "");
+                startCollabHost(password, port, perms, nick, avatar);
+                reply(cbId, ok()); // 结果经 collab-host-started 事件推送
+                return;
+            }
+            case "collabJoin": {
+                final String ip = args == null ? "" : args.optString("ip", "");
+                final int port = args == null ? 8080 : args.optInt("port", 8080);
+                final String password = args == null ? "" : args.optString("password", "");
+                final String nick = args == null ? "" : args.optString("nickname", "");
+                final String avatar = args == null ? "" : args.optString("avatar", "");
+                startCollabJoin(ip, port, password, nick, avatar);
+                reply(cbId, ok()); // 结果经 collab-join-connected 事件推送
                 return;
             }
             case "collabEnd": {
+                endCollab();
                 NWActivity c = findFirstByType("collaboration");
                 if (c != null && c != caller) c.finish();
                 if (c == caller) caller.finish();
                 reply(cbId, ok());
                 return;
             }
-            case "collabChat": { reply(cbId, ok()); return; }
+            case "collabChat": {
+                final String text = args == null ? "" : args.optString("text", "");
+                CollabEngine.Host h = collabHost;
+                CollabEngine.Join j = collabJoin;
+                if (h != null) h.sendChat(text);
+                else if (j != null) j.sendChat(text);
+                reply(cbId, ok());
+                return;
+            }
+            case "collabSend": {
+                // 编辑器 GUI 导出的工程载荷：host 广播给客户端 / join 上传到服务器
+                String project = args == null ? null : args.optString("project", null);
+                String target = args == null ? null : args.optString("targetUsername", null);
+                if (project != null) {
+                    CollabEngine.Host h = collabHost;
+                    CollabEngine.Join j = collabJoin;
+                    if (h != null) { collabRoomProject = project; h.broadcastProject(project, emptyToNull(target)); }
+                    else if (j != null) j.sendProjectUpdate(project);
+                }
+                reply(cbId, ok());
+                return;
+            }
 
             /* ---------- 扩展编辑器 ---------- */
             case "extGetInitial": {
@@ -1592,7 +1659,12 @@ public class BridgeHub {
                             .put("mode", "host")
                             .put("path", uri.toString())
                             .put("name", name);
+                    // host 需要承载工程的编辑器作为权威源（对齐桌面版：协作底层
+                    // 始终是编辑器窗口，协作聊天是浮动小窗）。先把选中的 sb3 设为
+                    // 编辑器初始文件并拉起编辑器，编辑器启动后 getInitialFile 会加载它；
+                    // 再打开浮动的协作聊天窗叠在上面。
                     pendingInitialFile = uri;
+                    WindowActivity.show(activity, "editor", null);
                     WindowActivity.show(activity, "collaboration", payload.toString());
                     reply(p.cbId, new JSONObject().put("result", "opened").toString());
                     return;
@@ -1912,6 +1984,208 @@ public class BridgeHub {
     private void ensureEditorHost(NWActivity caller) {
         if (caller == null || getEditor() != null) return;
         WindowActivity.showSoloHost(caller);
+    }
+
+    /* ============================================================
+     * 协作集成：Java 网络引擎 ↔ WebView 事件桥
+     * 所有 CollabEngine 回调都发生在网络线程，统一经 evaluateJs（自动切
+     * 主线程）推给窗口；编辑器状态同步走 requestEditor / evt。
+     * ============================================================ */
+
+    private static String emptyToNull(String s) {
+        return (s == null || s.isEmpty()) ? null : s;
+    }
+
+    /** 首个非回环 IPv4，含 WifiManager 兜底；失败回 127.0.0.1 */
+    private String localIP() {
+        try {
+            java.util.Enumeration<java.net.NetworkInterface> nifs = java.net.NetworkInterface.getNetworkInterfaces();
+            while (nifs.hasMoreElements()) {
+                java.net.NetworkInterface nif = nifs.nextElement();
+                if (nif.isLoopback() || !nif.isUp()) continue;
+                java.util.Enumeration<java.net.InetAddress> addrs = nif.getInetAddresses();
+                while (addrs.hasMoreElements()) {
+                    java.net.InetAddress a = addrs.nextElement();
+                    if (a instanceof java.net.Inet4Address && !a.isLoopbackAddress()
+                            && !a.isLinkLocalAddress()) return a.getHostAddress();
+                }
+            }
+        } catch (Exception ignored) {}
+        return "127.0.0.1";
+    }
+
+    /** 向协作窗口推事件（module='collab'，UI 的 on* 监听都用此 module） */
+    private void collabUIEvent(String event, Object data) {
+        NWActivity w = findFirstByType("collaboration");
+        if (w != null) w.evaluateJs("__nw.evt('collab'," + jq(event) + "," + jqRaw(data) + ")");
+    }
+
+    /** 向编辑器推协作状态（role/onlineCount/permissions） */
+    private void collabEditorState(boolean active, String role, int online, JSONObject perms) {
+        try {
+            JSONObject o = new JSONObject()
+                    .put("isCollaborating", active)
+                    .put("role", active ? role : JSONObject.NULL)
+                    .put("onlineCount", active ? online : 0);
+            if (active && perms != null) o.put("permissions", perms);
+            notifyEditorEvent("collaboration-state-changed", o);
+        } catch (Exception ignored) {}
+    }
+
+    /** host: 让编辑器把当前工程推给指定成员（或全部）。编辑器 GUI 收到后
+     *  走 sendCollabProjectJSON → inv('collabSend') → 本类的 collabSend case。 */
+    private void collabRequestEditorProject(final String targetUsername) {
+        try {
+            JSONObject payload = new JSONObject();
+            if (targetUsername != null) payload.put("targetUsername", targetUsername);
+            // fire-and-forget：GUI 的 onCollabRequestProjectJSON 回调内部会主动
+            // 调 sendCollabProjectJSON，不依赖 hub 返回值
+            NWActivity ed = getEditor();
+            if (ed == null) { ensureEditorHost(findFirstByType("collaboration")); return; }
+            final String rid = rid("collabreq" + System.nanoTime());
+            main.post(() -> ed.evaluateJs("__nw.editorRequest('collab-request-project-json',"
+                    + jqRaw(payload) + "," + jq(rid) + ")"));
+        } catch (Exception ignored) {}
+    }
+
+    /** host: 把参与者/聊天/成员变更等网络事件接到 UI 与编辑器 */
+    private CollabEngine.HostCallback hostCallback() {
+        return new CollabEngine.HostCallback() {
+            @Override public void onClientJoin(String username, String avatar) {
+                try {
+                    collabUIEvent("client-join", new JSONObject().put("username", username)
+                            .put("avatar", avatar).put("onlineCount", collabHost == null ? 1 : collabHost.getTotalOnlineCount())
+                            .put("members", collabHost == null ? new JSONArray() : collabHost.getRoster()));
+                    collabEditorState(true, "host", collabHost == null ? 1 : collabHost.getTotalOnlineCount(), collabPermissions);
+                } catch (Exception ignored) {}
+            }
+            @Override public void onClientLeave(String username) {
+                try {
+                    collabUIEvent("client-leave", new JSONObject().put("username", username)
+                            .put("onlineCount", collabHost == null ? 1 : collabHost.getTotalOnlineCount())
+                            .put("members", collabHost == null ? new JSONArray() : collabHost.getRoster()));
+                    collabEditorState(true, "host", collabHost == null ? 1 : collabHost.getTotalOnlineCount(), collabPermissions);
+                } catch (Exception ignored) {}
+            }
+            @Override public void onChatMessage(JSONObject message) {
+                try { collabUIEvent("chat-message", message); } catch (Exception ignored) {}
+            }
+            @Override public void onProjectRequest(String username) {
+                collabRequestEditorProject(username);
+            }
+            @Override public void onProjectUpdate(JSONObject data) {
+                // 参与者改了工程 → 推给编辑器 apply（大 payload 走 evt，编辑器侧有 cooldown）
+                notifyEditorEvent("collab-project-update", data);
+            }
+            @Override public void onProjectUpdateRejected(String username, JSONObject decision) {
+                try {
+                    collabUIEvent("permission-denied", new JSONObject().put("scope", "host")
+                            .put("username", username).put("message",
+                                    username + " 的项目更新被拒绝：" + decision.optString("message", "")));
+                } catch (Exception ignored) {}
+            }
+        };
+    }
+
+    /** join: 连接建立后的网络事件桥 */
+    private CollabEngine.JoinCallback joinCallback() {
+        return new CollabEngine.JoinCallback() {
+            @Override public void onConnected(JSONObject authResult) {
+                try {
+                    JSONObject o = new JSONObject()
+                            .put("success", true)
+                            .put("permissions", authResult.opt("permissions"))
+                            .put("username", authResult.optString("username", ""))
+                            .put("avatar", authResult.optString("avatar", "👤"))
+                            .put("onlineCount", authResult.optInt("onlineCount", 1))
+                            .put("hostName", authResult.optString("hostName", "主机"))
+                            .put("hostAvatar", authResult.optString("hostAvatar", "🏠"))
+                            .put("members", authResult.opt("members"));
+                    collabUIEvent("join-connected", o);
+                    collabEditorState(true, "participant", authResult.optInt("onlineCount", 1),
+                            authResult.optJSONObject("permissions"));
+                } catch (Exception ignored) {}
+            }
+            @Override public void onChatMessage(JSONObject message) { try { collabUIEvent("chat-message", message); } catch (Exception ignored) {} }
+            @Override public void onProjectUpdate(JSONObject data) { notifyEditorEvent("collab-project-update", data); }
+            @Override public void onPermissionDenied(JSONObject message) {
+                try {
+                    JSONObject o = new JSONObject().put("scope", "self")
+                            .put("message", message.optString("message", "项目更新被主机拒绝"));
+                    collabUIEvent("permission-denied", o);
+                } catch (Exception ignored) {}
+            }
+            @Override public void onMemberJoined(JSONObject message) {
+                try {
+                    collabUIEvent("member-joined", message);
+                    collabEditorState(true, "participant", message.optInt("onlineCount", 1), collabPermissions);
+                } catch (Exception ignored) {}
+            }
+            @Override public void onMemberLeft(JSONObject message) {
+                try {
+                    collabUIEvent("member-left", message);
+                    collabEditorState(true, "participant", message.optInt("onlineCount", 1), collabPermissions);
+                } catch (Exception ignored) {}
+            }
+            @Override public void onEnded(String reason) {
+                try { collabUIEvent("collaboration-ended", new JSONObject().put("reason", reason)); } catch (Exception ignored) {}
+                collabEditorState(false, null, 0, null);
+            }
+            @Override public void onError(String error) {
+                try { collabUIEvent("join-connected", new JSONObject().put("success", false).put("error", error)); } catch (Exception ignored) {}
+            }
+        };
+    }
+
+    private void startCollabHost(final String password, final int port, JSONObject perms,
+                                  String nickname, String avatar) {
+        endCollab();
+        collabPermissions = perms != null ? perms : new JSONObject();
+        collabHostName = (nickname == null || nickname.trim().isEmpty()) ? "主机" : nickname.trim();
+        collabHostAvatar = (avatar == null || avatar.isEmpty()) ? "🏠" : avatar;
+        final JSONObject p = collabPermissions;
+        final String hn = collabHostName, ha = collabHostAvatar;
+        new Thread(() -> {
+            CollabEngine.Host h = new CollabEngine.Host(port, password, p, hn, ha, hostCallback());
+            boolean started = h.start();
+            if (!started) {
+                try { collabUIEvent("host-started", new JSONObject().put("success", false)
+                        .put("error", "无法启动协作服务，请检查密码与端口是否被占用")); } catch (Exception ignored) {}
+                return;
+            }
+            collabHost = h;
+            try {
+                collabUIEvent("host-started", new JSONObject().put("success", true)
+                        .put("onlineCount", 1).put("nickname", hn).put("avatar", ha)
+                        .put("members", h.getRoster()));
+                collabEditorState(true, "host", 1, p);
+                // 主机启动后让编辑器把当前工程设为房间权威状态（供参与者 diff 比对）
+                collabRequestEditorProject(null);
+            } catch (Exception ignored) {}
+        }, "nw-collab-host").start();
+    }
+
+    private void startCollabJoin(final String ip, final int port, final String password,
+                                 String nickname, String avatar) {
+        endCollab();
+        final String nick = nickname == null ? "" : nickname.trim();
+        final String av = (avatar == null || avatar.isEmpty()) ? "👤" : avatar;
+        new Thread(() -> {
+            CollabEngine.Join j = new CollabEngine.Join(ip, port, password, nick, av, joinCallback());
+            boolean ok = j.connect();
+            if (ok) collabJoin = j; // 失败时 connect 内部已通过 onError 推事件
+        }, "nw-collab-join").start();
+    }
+
+    private void endCollab() {
+        CollabEngine.Host h = collabHost;
+        CollabEngine.Join j = collabJoin;
+        collabHost = null;
+        collabJoin = null;
+        collabRoomProject = null;
+        if (h != null) { try { h.end(); } catch (Exception ignored) {} }
+        if (j != null) { try { j.close(); } catch (Exception ignored) {} }
+        collabEditorState(false, null, 0, null);
     }
 
     /** 编辑器窗口回传 hub 请求结果 → 直达发起方回调 */
@@ -2282,7 +2556,7 @@ public class BridgeHub {
         try {
             return app.getPackageManager().getPackageInfo(app.getPackageName(), 0).versionName;
         } catch (Exception e) {
-            return "0.0.4";
+            return "0.0.6";
         }
     }
 

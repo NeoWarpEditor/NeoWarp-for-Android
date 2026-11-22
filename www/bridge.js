@@ -2178,6 +2178,13 @@
     editorRequests['export-project'] = function () {
       return exportForPackager();
     };
+    // 协作：主机请求编辑器把当前工程发给指定成员（或全部）。GUI 的
+    // onCollabRequestProjectJSON 回调会主动调 sendCollabProjectJSON → inv('collabSend')，
+    // 不依赖本 handler 的返回值，因此这里仅触发 deliverQueue 后立即 resolve。
+    editorRequests['collab-request-project-json'] = function (payload) {
+      fire('collab-request-project-json', payload);
+      return Promise.resolve({ ok: true });
+    };
   }
 
   var pendingAI = Object.create(null);
@@ -3024,10 +3031,17 @@
       onMemberJoined: function (callback) { on('collab', 'member-joined', callback); },
       onMemberLeft: function (callback) { on('collab', 'member-left', callback); },
       onCollaborationEnded: function (callback) { on('collab', 'collaboration-ended', callback); },
+      onPermissionDenied: function (callback) { on('collab', 'permission-denied', callback); },
       onFocusChat: function (callback) { on('collab', 'focus-chat', callback); },
       onEndRequested: function (callback) { on('collab', 'end-requested', callback); },
       onLeaveRequested: function (callback) { on('collab', 'leave-requested', callback); },
-      onThemeChanged: function (callback) { on('collab', 'theme-changed', callback); }
+      // Java broadcastTheme 用窗口 type 'collaboration' 作 module、推裸主题字符串；
+      // 这里对齐实际投递，并兼容 {theme} 对象，保证协作窗口跟随全局主题切换
+      onThemeChanged: function (callback) {
+        on('collaboration', 'theme-changed', function (data) {
+          callback(typeof data === 'string' ? { theme: data } : data);
+        });
+      }
     };
   }
 
