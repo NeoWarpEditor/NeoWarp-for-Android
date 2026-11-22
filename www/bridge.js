@@ -26,7 +26,7 @@
    * ============================================================ */
   var WIN_TYPE = (function () {
     // solo 助手窗口：/ai-assistant/ai-assistant.html?nwwin=solo（Electron 独立窗口入口）
-    if (location.search.indexOf('nwwin=solo') >= 0) return 'solo';
+    if (/[?&]nwwin=solo(&|$)/.test(location.search)) return 'solo';
     var p = location.pathname;
     if (p.indexOf('/editor/') === 0) return 'editor';
     var m = p.match(/^\/([a-z-]+)\//);
@@ -75,9 +75,7 @@
     var entry = callbacks[id];
     if (!entry) return;
     delete callbacks[id];
-    var value = null;
-    try { value = json === null || json === undefined ? null : JSON.parse(json); }
-    catch (e) { value = null; }
+    var value = parseEvtPayload(json);
     if (entry.rejectWhenError && value && typeof value === 'object' && value.__nwError) {
       entry.reject(new Error(value.message || 'bridge error'));
     } else {
@@ -85,10 +83,19 @@
     }
   }
 
+  // jqRaw 注入的载荷可能是裸对象字面量而非字符串（Java String.valueOf 直接
+  // 拼进 evaluateJavascript）：JSON.parse("[object Object]") 会抛异常把
+  // data/payload 变 null——舞台帧事件「0 到达」、AI 工具请求
+  // 「Cannot read properties of null (reading 'requestId')」都是它。
+  // 统一兼容：对象直接用，字符串才 parse。
+  function parseEvtPayload(json) {
+    if (json === null || json === undefined) return null;
+    if (typeof json === 'object') return json;
+    try { return JSON.parse(json); } catch (e) { return null; }
+  }
+
   function evt(module, event, json) {
-    var data = null;
-    try { data = json === null || json === undefined ? null : JSON.parse(json); }
-    catch (e) { data = null; }
+    var data = parseEvtPayload(json);
     var list = listeners[module] && listeners[module][event];
     if (list) for (var i = 0; i < list.length; i++) {
       try { list[i](data); } catch (e) { console.error(e); }
@@ -146,8 +153,8 @@
     /** Java 发起的编辑器服务端请求（AI 工具/项目 JSON/主题/角色统计等） */
     editorRequest: function (type, json, requestId) {
       var fn = editorRequests[type];
-      var payload = null;
-      try { payload = json ? JSON.parse(json) : null; } catch (e) { payload = null; }
+      // json 兼容裸对象：jqRaw 对 JSONObject 注入的是对象字面量，不是字符串
+      var payload = parseEvtPayload(json);
       if (!fn) {
         // 无监听：按 Electron 语义回复空/失败
         if (type === 'theme') window.__nw.hubRespond(requestId, { theme: 'light' });
@@ -157,7 +164,13 @@
         return;
       }
       Promise.resolve().then(function () { return fn(payload, requestId); })
-        .then(function (result) { window.__nw.hubRespond(requestId, result); })
+        .then(function (result) {
+          window.__nw.hubRespond(requestId, result);
+          // AI 工具调用完成后调度 SOLO 工程自动保存（scheduleSoloPersist：
+          // debounce 1.2s 把 VM 当前工程回写原 sb3 文件）。失败的工具没改
+          // 状态、只读工具也没改，多余调度由 debounce 合并，无害。
+          try { if (type === 'ai-tool') scheduleSoloPersist(); } catch (e2) {}
+        })
         .catch(function (e) { window.__nw.hubRespond(requestId, { error: String(e && e.message || e) }); });
     },
     /** 编辑器服务端响应回传 Java hub */
@@ -2062,10 +2075,64 @@
     }, false);
 
     // 编辑器作为服务端：响应 hub 转发来的请求
+    // GUI 的 AI 工具监听（deliverQueue['ai-tool-call']）在 initial project
+    // 加载完成后才注册（GUI 调 sendAIListenersReady）。宿主刚拉起时到达的
+    // ai-tool 请求若直接 fire 会落进空队列永久丢失——表现为 SOLO 的工具
+    // 调用全部静默返回 null（AI 眼里「无法调用任何 tool」）。先暂存，
+    // sendAIListenersReady 时再 flush。
+    /* ── SOLO 工程自动保存 ──
+       AI 的每次工具调用（加角色/改积木…）都直接修改宿主 VM 的工程状态，
+       此前这些修改只存在于内存：应用被杀或宿主窗口重建后全部丢失。现在
+       每次 ai-tool 完成后 debounce 1.2s，把 vm.saveProject() 序列化的 sb3
+       回写到原 handle 文件（Documents/NeoWarp/xxx.sb3）——重进后加载的
+       永远是最新版本。仅在宿主通过 solo-load-project 装载过工程
+       （soloLoadedHandle 非空）时生效：普通编辑器窗口 / 编辑器浮窗 AI
+       完全不受影响。 */
+    var soloLoadedHandle = null;
+    var soloPersistTimer = 0;
+    var scheduleSoloPersist = function () {
+      if (!soloLoadedHandle) return;
+      clearTimeout(soloPersistTimer);
+      soloPersistTimer = setTimeout(persistSoloProject, 1200);
+    };
+    var persistSoloProject = function () {
+      var vm = window.vm;
+      if (!vm || !vm.saveProject || !soloLoadedHandle) return;
+      vm.saveProject().then(function (buf) {
+        var bytes = new Uint8Array(buf);
+        var bin = '';
+        for (var i = 0; i < bytes.length; i += 8192) {
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(bytes.length, i + 8192)));
+        }
+        return inv('soloWriteHandle', { handleId: soloLoadedHandle.handleId, data: btoa(bin) });
+      }).catch(function (e) {
+        try { window.__nwSoloStats.err = 'save:' + e; } catch (e2) {}
+      });
+    };
+
+    var aiListenersUp = false;
+    var deferredAITools = [];
     editorRequests['ai-tool'] = function (payload) {
+      // 载荷缺失（序列化失败等）时明确报错回传，绝不抛 TypeError——异常会被
+      // editorRequest 的 catch 转成 {error: "Cannot read..."}，AI 眼里就是
+      // 所有工具集体失败
+      if (!payload || !payload.requestId) {
+        return Promise.resolve({ requestId: payload && payload.requestId, success: false, error: 'Malformed ai-tool request payload' });
+      }
+      // Android SOLO：createProject 由本页（工程宿主编辑器）本地实现——GUI bundle
+      // 没有 createProject 工具（上游由 Electron 主进程处理），原样转发只会返回
+      // "Unknown tool"，SOLO 的工程 chip 永远停在「选择工程」。这里构造空白工程
+      // 加载进 VM，成功后启动舞台画面流，并把工程信息回给 SOLO 更新 chip。
+      if (payload.toolName === 'createProject') {
+        return soloCreateProject(payload);
+      }
       return new Promise(function (resolve) {
-        pendingAI[payload.requestId] = resolve;
-        fire('ai-tool-call', payload);
+        if (aiListenersUp) {
+          pendingAI[payload.requestId] = resolve;
+          fire('ai-tool-call', payload);
+        } else {
+          deferredAITools.push({ payload: payload, resolve: resolve });
+        }
       });
     };
     // 项目分析/AI 取码依赖 editor GUI 先注册 onRequestProjectJSON。若请求早于
@@ -2120,6 +2187,61 @@
   var pendingTheme = Object.create(null);
   var pendingSoloExport = Object.create(null);
   var exportForPackager = function () { return Promise.reject(new Error('exportForPackager missing')); };
+
+  // 等待宿主编辑器的 VM 就绪：SOLO 打开时才拉起宿主 editor 窗口，GUI bundle
+  // 挂载（window.vm 赋值）晚于首个工具请求。轮询最多 8s，超时放弃。
+  function waitHostVM(timeoutMs) {
+    var deadline = Date.now() + (timeoutMs || 15000);
+    return new Promise(function (resolve) {
+      (function poll() {
+        if (window.vm && window.vm.runtime && window.vm.loadProject) return resolve(window.vm);
+        if (Date.now() >= deadline) return resolve(null);
+        setTimeout(poll, 200);
+      })();
+    });
+  }
+
+  // SOLO create_project 的本地实现：构造空白工程（无 costume，scratch-vm 会自动
+  // 建空背景，已实测可加载）装进宿主编辑器的 VM，然后启动舞台画面流。返回结构与
+  // GUI 的 ai-tool 响应一致（{requestId, result:{success, data:{project}}})，
+  // SOLO 页面据此把工程 chip 从「选择工程」切到新工程名。
+  function soloCreateProject(payload) {
+    return new Promise(function (resolve) {
+      var finish = function (result) {
+        resolve({ requestId: payload && payload.requestId, result: result });
+      };
+      var name = (payload && payload.params &&
+        (payload.params.name || payload.params.projectName || payload.params.title)) || 'Untitled';
+      // 宿主刚拉起时 GUI bundle 加载较慢（真机可达 10-20s），默认 15s 会不够
+      waitHostVM(30000).then(function (vm) {
+      if (!vm) {
+        finish({ success: false, error: 'Editor VM is not ready' });
+        return;
+      }
+      var emptyProject = {
+        targets: [{
+          isStage: true, name: 'Stage',
+          variables: {}, lists: {}, broadcasts: {}, blocks: {}, comments: {},
+          currentCostume: 0, costumes: [], sounds: [], volume: 100, layerOrder: 0,
+          tempo: 60, videoTransparency: 50, videoState: 'on', textToSpeechLanguage: null
+        }],
+        monitors: [], extensions: [],
+        meta: { semver: '3.0.0', vm: '0.2.0', agent: '' }
+      };
+      vm.loadProject(JSON.stringify(emptyProject)).then(function () {
+        // 等价上游主进程的 solo-stage-stream {active:true}：宿主开始向 SOLO
+        // 推送舞台帧，侧边栏缩略图和舞台窗口才有画面。fire 是本地同步分发，
+        // GUI 组件挂载后才注册监听——加一次延迟重试兜底（startSoloStream
+        // 有 soloStreamActive 幂等保护，重复触发无害）
+        try { fire('solo-stage-stream', { active: true }); } catch (e) {}
+        setTimeout(function () { try { fire('solo-stage-stream', { active: true }); } catch (e) {} }, 1200);
+        finish({ success: true, data: { project: { name: String(name), type: 'sb3' } } });
+      }).catch(function (e) {
+        finish({ success: false, error: String((e && e.message) || e) });
+      });
+      });
+    });
+  }
 
   // 页面侧注册的编辑器回调（onRequestProjectJSON / onAIToolCall / ...）
   var deliverQueue = Object.create(null);
@@ -2193,7 +2315,17 @@
     onCompactWindowStyleChanged: function (cb) { on('editor', 'compact-window-style-changed', cb); },
     sendTitleBarOverlayColor: function () { /* Android 无原生窗口覆盖层，忽略 */ },
     onOSFullscreenChanged: function (cb) { on('editor', 'os-fullscreen-changed', cb); },
-    sendAIListenersReady: function () { return inv('aiListenersReady'); },
+    sendAIListenersReady: function () {
+      // GUI 的 AI 监听已全部注册：flush 暂存的 ai-tool 请求（见 editorRequests['ai-tool']）
+      aiListenersUp = true;
+      var d = deferredAITools; deferredAITools = [];
+      for (var i = 0; i < d.length; i++) {
+        if (!d[i].payload || !d[i].payload.requestId) { d[i].resolve({ success: false, error: 'Malformed ai-tool request payload' }); continue; }
+        pendingAI[d[i].payload.requestId] = d[i].resolve;
+        try { fire('ai-tool-call', d[i].payload); } catch (e) {}
+      }
+      return inv('aiListenersReady');
+    },
     onImportCostume: function (cb) { on('editor', 'import-costume', cb); },
     sendImportCostumeResult: function (data) { return inv('importCostumeResult', data || {}); },
     /* 「新窗口」= 在当前页面新建项目：走 scratch-gui 的 new-project action，
@@ -2328,10 +2460,19 @@
     onSoloStageStream: function (callback) { deliverQueue['solo-stage-stream'] = [callback]; },
     sendSoloStageFrame: function (dataURL) {
       if (!java) return;
+      // 主通道：写 Java 帧槽，消费窗口轮询拉取。大 dataURL 拼进 evaluateJs
+      // 的 __nw.evt 在真机上不可靠（诊断：宿主 749 帧 0 到达，而 cb 小消息
+      // 通道正常），帧槽负载走已被证明可靠的 cb 回复通道。
+      try { java.soloStore('frame', String(dataURL)); } catch (e) {}
+      // 兼容通道：上游语义的窗口事件投递（小负载在这条路上没问题）
       try { java.forwardToWindow('solo-stage', 'solo-stage-window-frame', JSON.stringify(dataURL)); } catch (e) {}
+      // 补投 SOLO 主窗口：侧边栏舞台缩略图监听 'solo','stage-frame'（上游主进程
+      // 会把帧广播给 SOLO 页面与舞台窗口两者，Android 原先只发舞台窗口）
+      try { java.forwardToWindow('solo', 'stage-frame', JSON.stringify(dataURL)); } catch (e) {}
     },
     sendSoloStageOverlays: function (data) {
       if (!java) return;
+      try { java.soloStore('overlays', JSON.stringify(data)); } catch (e) {}
       try { java.forwardToWindow('solo-stage', 'solo-stage-window-overlays', JSON.stringify(data)); } catch (e) {}
     },
     onSoloStageAnswer: function (callback) { deliverQueue['solo-stage-answer'] = [callback]; },
@@ -2339,6 +2480,7 @@
     sendSoloStageControl: function (data) { window.__nw.hubRespond(WIN_TYPE, data && data.requestId, JSON.stringify(data)); },
     sendSoloStageRunStatus: function (data) {
       if (!java) return;
+      try { java.soloStore('runStatus', JSON.stringify(data)); } catch (e) {}
       try { java.forwardToWindow('solo-stage', 'solo-stage-window-run-status', JSON.stringify(data)); } catch (e) {}
     },
     onRequestTheme: function (callback) { deliverQueue['request-theme'] = [callback]; },
@@ -2374,7 +2516,13 @@
         deliverQueue[k] = [];
       });
       pendingAI = Object.create(null);
+      // GUI 卸载监听后回到未就绪态：后续请求继续走 deferred 暂存，防 fire 丢失
+      aiListenersUp = false;
     },
+    /* SOLO 手动选择的工程（solo-pick 的文件 handle）：Java 转发到本页后由下面
+       on('editor','solo-load-project') 按 handleId 取文件（sb3 zip → ArrayBuffer）
+       加载进 VM，并启动舞台画面流。上游由 Electron 主进程完成，GUI bundle
+       不认识这个事件，只能由 bridge 自理。 */
     openCollaborationHost: function () { return inv('openWindow', { type: 'collaboration', payload: { mode: 'host' } }); },
     openCollaborationJoin: function () { return inv('openWindow', { type: 'collaboration', payload: { mode: 'join' } }); },
     endCollaboration: function () { return inv('collabEnd'); },
@@ -2386,6 +2534,103 @@
     onCollabProjectUpdate: function (callback) { on('editor', 'collab-project-update', callback); },
     sendCollabProjectUpdate: function (project) { return inv('collabSend', { project: project }); }
   };
+
+  /* ── SOLO 舞台帧泵 ──
+     宿主编辑器被 solo 全屏覆盖后 Activity 进入 stopped 态，WebView 的
+     requestAnimationFrame 停摆，GUI 的渲染循环（rAF 驱动 renderer.draw）
+     不再执行——requestSnapshot 只是把回调压栈等下一次 draw，draw 永远
+     不来，舞台窗口就永远停在「Waiting for stage…」。
+     但 GL 命令提交与页面可见性无关：draw() 是同步 GL 调用，toDataURL
+     读回 framebuffer 也不需要合成器。这里暴露 __nw.soloPump，由 Java
+     Handler 定时 pulse（主驱动，evaluateJavascript 不受页面节流）+
+     本地 setInterval 兜底（后台节流后约 1fps，保证画面不至于完全冻结），
+     同步驱动一帧渲染并把快照推给 solo-stage 窗口与 SOLO 缩略图。
+     GUI 自己堆积的快照回调会在 draw 里一并 flush（其回调内含完整
+     monitors/提问覆盖层推送），所以只保留最新一个避免瞬间生成几百张
+     dataURL 造成卡顿。 */
+  // 诊断统计：Java 的 soloDebug 会把这些带回 solo-stage 窗口显示，
+  // 用于真机上定位「Waiting for stage…」卡在哪一环
+  window.__nwSoloStats = { calls: 0, vmSeen: false, drawOk: 0, frames: 0, err: '', reported: 0 };
+  function soloPumpReport(force) {
+    var st = window.__nwSoloStats;
+    if (!force && st.calls - st.reported < 8) return; // 约 1s 上报一次
+    st.reported = st.calls;
+    try { inv('soloPumpReport', JSON.parse(JSON.stringify(st))); } catch (e) {}
+  }
+  window.__nw.soloPump = function () {
+    var st = window.__nwSoloStats;
+    st.calls++;
+    var vm = window.vm;
+    if (!vm || !vm.runtime || !vm.renderer || !vm.renderer.draw || !vm.renderer.requestSnapshot) {
+      soloPumpReport(false);
+      return;
+    }
+    st.vmSeen = true;
+    var r = vm.renderer;
+    try {
+      if (r._snapshotCallbacks && r._snapshotCallbacks.length > 1) {
+        r._snapshotCallbacks.length = 1;
+      }
+      r.requestSnapshot(function (dataURL) {
+        try { EditorPreload.sendSoloStageFrame(dataURL); st.frames++; } catch (e) { st.err = 'send:' + e; }
+      });
+      r.draw();
+      st.drawOk++;
+    } catch (e) {
+      st.err = 'draw:' + e;
+      // WebGL context 丢失等情况：记录后等下一轮
+    }
+    soloPumpReport(false);
+  };
+  var soloPumpTimer = null;
+  function startSoloPumpTimer() {
+    if (soloPumpTimer) return;
+    soloPumpTimer = setInterval(function () {
+      try { window.__nw.soloPump(); } catch (e) {}
+    }, 1000);
+  }
+
+  // SOLO 手动选工程 → 宿主编辑器加载（solo-load-project 事件由 Java 从
+  // soloLoadProjectToEditor 转发而来）。拿到后按 handleId 取 sb3 zip，
+  // vm.loadProject(ArrayBuffer) 直接吃 zip；加载完启动舞台画面流。
+  // 仅 editor 窗口执行：此前这段在顶层作用域，solo/solo-stage 窗口启动时
+  // 也会执行——soloPullPendingProject 会把 Java 暂存的 pending 工程抢走，
+  // 再从非宿主窗口 evt 投给 editor（editor 可能尚不存在）而丢失，
+  // 舞台于是永远「工程尚未加载完成」。
+  if (WIN_TYPE === 'editor') {
+    inv('soloPullPendingProject').then(function (pending) {
+      if (pending && pending.handleId) {
+        try { evt('editor', 'solo-load-project', JSON.stringify(pending)); } catch (e) {}
+      }
+    });
+    // 宿主页面 bridge.js 已就绪：通知 Java 重投暂存期间收到的 hub 请求
+    // （宿主缺失时 requestEditor 不再直接 reply null，而是暂存 + 拉宿主）
+    inv('soloPullPendingEditorReqs').catch(function () {});
+
+    on('editor', 'solo-load-project', function (d) {
+      var handleId = d && (d.handleId || d.id);
+      if (!handleId) return;
+      // 记录工程 handle：此后每次 AI 工具调用完成后自动回写该文件（自动保存）
+      soloLoadedHandle = { handleId: String(handleId), name: String((d && d.name) || '') };
+      // 宿主刚拉起时 GUI bundle 加载较慢，30s 覆盖真机冷启动
+      waitHostVM(30000).then(function (vm) {
+        if (!vm) return;
+        return fetch('/__file/' + handleId).then(function (r) {
+          if (!r.ok) throw new Error('fetch handle failed ' + r.status);
+          return r.arrayBuffer();
+        }).then(function (buf) {
+          return vm.loadProject(buf);
+        }).then(function () {
+          startSoloPumpTimer();
+          try { fire('solo-stage-stream', { active: true }); } catch (e) {}
+          setTimeout(function () { try { fire('solo-stage-stream', { active: true }); } catch (e) {} }, 1200);
+        });
+      }).catch(function (e) {
+        console.error('solo-load-project failed:', e);
+        try { window.__nwSoloStats.err = 'load:' + e; soloPumpReport(true); } catch (e2) {}
+      });
+    });
+  }
 
   function replyPending(map, data) {
     var keys = Object.keys(map);
@@ -2687,7 +2932,18 @@
       openWorkflowDocsDir: function () { return inv('aiOpenWorkflowDocsDir'); },
       onWorkflowSettingsChanged: function (callback) { on('ai', 'workflow-settings-changed', callback); },
       openDesktopSettings: function () { return inv('openWindow', { type: 'desktop-settings' }); },
-      callTool: function (toolName, params) { return inv('requestEditorAITool', { toolName: toolName, params: params }); },
+      callTool: function (toolName, params) {
+        return inv('requestEditorAITool', { toolName: toolName, params: params }).then(function (res) {
+          // 编辑器响应统一为 {requestId, result} 双层包裹（Java hubRespond 原样透传）。
+          // 页面侧（工具结果卡片渲染、撤销状态刷新、SOLO create_project 的 chip
+          // 同步、截图多模态替换）全都按桌面版的扁平 {success, data, error} 消费，
+          // 不解包的话这些判断全部失效（chip 停在「选择工程」、卡片误标红 Failed）。
+          if (res && typeof res === 'object' && 'result' in res && 'requestId' in res) {
+            return res.result;
+          }
+          return res;
+        });
+      },
       webSearch: function (query) { return inv('webSearch', { query: query }); },
       getTheme: function () { return inv('getTheme'); },
       getLocale: function () { return inv('getLocale'); },
@@ -2704,14 +2960,46 @@
     };
     window.AIAssistantPreload = AIPreload;
     if (WIN_TYPE === 'solo') {
+    var soloThumbTimer = null;
+    var soloThumbCb = null;
+    var soloThumbSeq = 0;
       window.SoloPreload = {
         getState: function () { return inv('soloGetState'); },
         pickProject: function (type) { return inv('soloPickProject', { type: type }); },
+        // SOLO AI 建工程：由 Java 真正创建并落盘（sb3 空工程 / js 源码文件），
+        // 返回 {id,name,type,path}。不依赖后台编辑器宿主窗口，
+        // chip 与保存路径都能可靠拿到。
+        createProject: function (name, type, content) {
+          return inv('soloCreateProject', { name: name, type: type || 'sb3', content: content == null ? null : String(content) });
+        },
+        // SOLO js 工程源码读写：直接走 Java 落盘（桌面版由主进程处理，
+        // 编辑器 GUI bundle 没有这两个工具，转发只会 Unknown tool）
+        readProjectFile: function (id) { return inv('soloReadProjectFile', { id: id }); },
+        writeProjectFile: function (id, content) { return inv('soloWriteProjectFile', { id: id, content: String(content == null ? '' : content) }); },
         saveProject: function () { return inv('soloSaveProject'); },
         openStageWindow: function () { return inv('openWindow', { type: 'solo-stage' }); },
+        // Android：把手动选中的工程真正加载进后台编辑器宿主（上游由主进程完成）；
+        // 宿主加载完自动开始推舞台帧，侧边栏缩略图与舞台窗口才有画面
+        loadProjectToEditor: function (handleId, name) { return inv('soloLoadProjectToEditor', { handleId: handleId, name: name }); },
         onProjectChanged: function (callback) { on('solo', 'project-changed', callback); },
-        onStageFrame: function (callback) { on('solo', 'stage-frame', callback); },
-        removeStageFrameListener: function () { off('solo', 'stage-frame'); }
+        // 舞台缩略图取帧：大 dataURL 的 evt 投递不可靠，主通道改为轮询帧槽；
+        // evt 通道保留并存（同帧重画无害）
+        onStageFrame: function (callback) {
+          on('solo', 'stage-frame', callback);
+          if (!soloThumbTimer) {
+            soloThumbTimer = setInterval(function () {
+              inv('soloPullSlots').then(function (r) {
+                if (r && r.frameSeq && r.frameSeq !== soloThumbSeq && soloThumbCb) {
+                  soloThumbSeq = r.frameSeq;
+                  if (typeof r.frame === 'string') {
+                    try { soloThumbCb(r.frame); } catch (e) {}
+                  }
+                }
+              });
+            }, 400);
+          }
+        },
+        removeStageFrameListener: function () { off('solo', 'stage-frame'); soloThumbCb = null; }
       };
     }
   }
@@ -2812,11 +3100,41 @@
       onOverlays: function (cb2) { ssListeners.overlays = cb2; },
       sendControl: function (action) { return inv('soloStageControl', { action: action }); },
       sendAnswer: function (text) { return inv('soloStageAnswer', { text: String(text == null ? '' : text) }); },
-      ready: function () { return inv('soloStageReady'); }
+      ready: function () { return inv('soloStageReady'); },
+      /** 诊断：宿主/泵/编辑器 VM 的链路状态，画面出不来时显示在 hint 里 */
+      debug: function () { return inv('soloDebug'); }
     };
     on('solo-stage', 'solo-stage-window-frame', function (d) { if (ssListeners.frame) ssListeners.frame(typeof d === 'string' ? d : d && d.value); });
     on('solo-stage', 'solo-stage-window-run-status', function (d) { if (ssListeners.runStatus) ssListeners.runStatus(d); });
     on('solo-stage', 'solo-stage-window-state', function (d) { if (ssListeners.state) ssListeners.state(d); });
     on('solo-stage', 'solo-stage-window-overlays', function (d) { if (ssListeners.overlays) ssListeners.overlays(d); });
+
+    // 帧槽轮询：大 dataURL 的事件投递在真机上不可靠，主动拉取才稳。
+    // seq 未变的周期只拉不画；槽里的帧/覆盖层/运行状态分发到已注册回调，
+    // 与 evt 通道并存（同帧重画无害）
+    var ssSeqs = {};
+    setInterval(function () {
+      inv('soloPullSlots').then(function (r) {
+        if (!r) return;
+        if (r.frameSeq && r.frameSeq !== ssSeqs.frame) {
+          ssSeqs.frame = r.frameSeq;
+          if (ssListeners.frame && typeof r.frame === 'string') {
+            try { ssListeners.frame(r.frame); } catch (e) {}
+          }
+        }
+        if (r.overlaysSeq && r.overlaysSeq !== ssSeqs.overlays) {
+          ssSeqs.overlays = r.overlaysSeq;
+          if (ssListeners.overlays) {
+            try { ssListeners.overlays(typeof r.overlays === 'string' ? JSON.parse(r.overlays) : r.overlays); } catch (e) {}
+          }
+        }
+        if (r.runStatusSeq && r.runStatusSeq !== ssSeqs.runStatus) {
+          ssSeqs.runStatus = r.runStatusSeq;
+          if (ssListeners.runStatus) {
+            try { ssListeners.runStatus(typeof r.runStatus === 'string' ? JSON.parse(r.runStatus) : r.runStatus); } catch (e) {}
+          }
+        }
+      });
+    }, 250);
   }
 })();

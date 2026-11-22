@@ -24,6 +24,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.File;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -126,6 +129,7 @@ public class BridgeHub {
     /* ---------------- SAF 等待回调 ---------------- */
     private static class PendingSaf {
         String winType; String cbId; String kind; String suggestedName;
+        String soloType;
         boolean multi;
         android.webkit.ValueCallback<Uri[]> chooserCallback;
     }
@@ -454,15 +458,32 @@ public class BridgeHub {
                 if (args.optString("search", "").length() > 0 && "addons".equals(type)) {
                     payload = new JSONObject().put("search", args.optString("search"));
                 }
+                /* SOLO 全屏模式依赖一个隐藏的编辑器宿主：SOLO 页面自己没有工程，
+                   AI 工具（create_project/积木/文件读写等）经 requestEditorAITool
+                   转发到宿主执行，舞台画面流也由宿主推送。没有宿主时 requestEditor
+                   第一行 getEditor()==null 就 reply null，SOLO 的工具调用全部静默
+                   失败——AI 报"已创建"，chip 却永远停在「选择工程」。
+                   这里在打开 solo 前确保宿主存在：透明隐形宿主压入同一任务栈
+                   （窗口透明 + 触摸穿透 + 不抢焦点，用户看到的一直是 SOLO，
+                   不再跳转编辑器），随后 solo 全屏盖在它上面（宿主 WebView
+                   继续存活）。宿主已存在则只开 solo。 */
+                if ("solo".equals(type) && caller != null && BridgeHub.get(caller).getEditor() == null) {
+                    WindowActivity.showSoloHost(caller);
+                }
+                if ("solo".equals(type) || "solo-stage".equals(type)) {
+                    BridgeHub.get(caller).startSoloFramePump();
+                }
                 WindowActivity.show(caller, type, payload == null ? null : payload.toString());
-                reply(cbId, ok());
+                // 带 success 标志：页面侧（SOLO 打开舞台窗口等）按 res.success
+                // 判断成败，空 {} 会让它误报「工程尚未加载完成」
+                reply(cbId, "{\"success\":true}");
                 return;
             }
             case "openNewWindow": {
                 // 编辑器「新窗口」：强制新建编辑器实例，不走单例前置复用
                 String type = args == null ? "editor" : args.optString("type", "editor");
                 WindowActivity.showNew(caller, type, null);
-                reply(cbId, ok());
+                reply(cbId, "{\"success\":true}");
                 return;
             }
             case "closeWindow": {
@@ -1109,6 +1130,7 @@ public class BridgeHub {
             case "soloPickProject": {
                 PendingSaf p = new PendingSaf();
                 p.winType = winType; p.cbId = cbId; p.kind = "solo-pick";
+                p.soloType = args.optString("type", "sb3");
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
                 i.setType("*/*");
@@ -1116,8 +1138,59 @@ public class BridgeHub {
                 caller.startIntentForResult(Intent.createChooser(i, "选择项目"), req);
                 return;
             }
+            /* SOLO 手动选中的工程交给后台编辑器宿主加载（上游由主进程完成）。
+               宿主按 handleId 取文件加载进 VM，加载完自动推舞台帧。 */
+            case "soloLoadProjectToEditor": {
+                JSONObject o = new JSONObject();
+                o.put("handleId", args.optString("handleId"));
+                o.put("name", args.optString("name"));
+                startSoloFramePump();
+                NWActivity ed = getEditor();
+                if (ed == null) {
+                    // 宿主缺失（或刚拉起还没加载完）：暂存投递，宿主起来后由
+                    // 泵/bridge.js 初始化拉取补投，避免 evt 投给未注册的监听器丢失。
+                    // 补建透明隐形宿主：不抢视觉/焦点，用户看到的始终是 SOLO
+                    pendingSoloLoad = o;
+                    WindowActivity.showSoloHost(caller);
+                } else {
+                    pendingSoloLoad = null;
+                    forwardToWindow(winType, "editor", "solo-load-project", o);
+                }
+                reply(cbId, ok());
+                return;
+            }
+            case "soloCreateProject": {
+                String name = args.optString("name", "Untitled");
+                String type = args.optString("type", "sb3");
+                String content = args.has("content") && !args.isNull("content") ? args.optString("content") : null;
+                createSoloProject(cbId, name, type, content);
+                return;
+            }
             case "soloSaveProject": {
                 promptSaveSb3(caller, winType, cbId, "solo-project.sb3", pendingInitialFile);
+                return;
+            }
+            /* SOLO js 工程源码读写：AI 的 read_js_file/write_js_file 直接落盘。
+               桌面版由主进程处理，Android 的编辑器 GUI bundle 没有这两个工具，
+               经 requestEditorAITool 转发只会 Unknown tool。 */
+            case "soloReadProjectFile": {
+                FileHandle h = handle(args.optString("id"));
+                if (h == null) { reply(cbId, jstr(null)); return; }
+                try {
+                    reply(cbId, jstr(new String(readAll(h.uri), StandardCharsets.UTF_8)));
+                } catch (Exception e) { reply(cbId, jstr(null)); }
+                return;
+            }
+            case "soloWriteProjectFile": {
+                FileHandle h = handle(args.optString("id"));
+                if (h == null) { reply(cbId, err(new Exception("File not found"))); return; }
+                try {
+                    writeToUri(h.uri, args.optString("content", "").getBytes(StandardCharsets.UTF_8));
+                    JSONObject o = new JSONObject();
+                    o.put("name", h.name);
+                    o.put("path", h.uri.toString());
+                    reply(cbId, o.toString());
+                } catch (Exception e) { reply(cbId, err(e)); }
                 return;
             }
             case "soloOpenStageWindow": {
@@ -1125,9 +1198,78 @@ public class BridgeHub {
                 reply(cbId, ok());
                 return;
             }
+            /* SOLO 工程自动保存：宿主编辑器在 AI 每次工具调用后把 vm.saveProject()
+               序列化的 sb3（base64）回写到原 handle 文件——应用被杀或宿主重建后，
+               重进 SOLO 加载到的仍是最新版本。 */
+            case "soloWriteHandle": {
+                FileHandle h = handle(args.optString("handleId"));
+                if (h == null) { reply(cbId, err(new Exception("File not found"))); return; }
+                try {
+                    byte[] bytes = android.util.Base64.decode(args.optString("data", ""), android.util.Base64.NO_WRAP);
+                    writeToUri(h.uri, bytes);
+                    JSONObject o = new JSONObject();
+                    o.put("name", h.name);
+                    o.put("saved", true);
+                    reply(cbId, o.toString());
+                } catch (Exception e) { reply(cbId, err(e)); }
+                return;
+            }
+
+            /* ---------- SOLO 舞台诊断 ---------- */
+            case "soloPumpReport": {
+                soloPumpReport = args.toString();
+                reply(cbId, ok());
+                return;
+            }
+            case "soloPullPendingProject": {
+                JSONObject p = pendingSoloLoad;
+                pendingSoloLoad = null;
+                reply(cbId, p == null ? jstr(null) : p.toString());
+                return;
+            }
+            case "soloPullPendingEditorReqs": {
+                // 宿主页面 bridge.js 已就绪（此刻 getEditor() 即 caller）：
+                // 重投宿主缺失期间暂存的 hub 请求。GUI 尚未挂载监听的 ai-tool
+                // 由 bridge.js 的 deferred 队列兜住，不会丢。
+                if (getEditor() == null) { reply(cbId, ok()); return; }
+                String sReq;
+                int nReq = 0;
+                while ((sReq = pendingEditorReqs.poll()) != null && nReq < 50) {
+                    try {
+                        JSONObject p2 = new JSONObject(sReq);
+                        requestEditor(p2.optString("fromType"), p2.optString("reqType"),
+                                p2.optJSONObject("payload"), p2.optString("cbId"),
+                                p2.optLong("timeoutMs", 180000));
+                        nReq++;
+                    } catch (Exception ignored) {}
+                }
+                reply(cbId, ok());
+                return;
+            }
+            case "soloPullSlots": {
+                JSONObject o = new JSONObject();
+                for (java.util.Map.Entry<String, String> e : soloSlots.entrySet()) {
+                    o.put(e.getKey() + "Seq", soloSlotSeqs.get(e.getKey()));
+                    o.put(e.getKey(), e.getValue());
+                }
+                reply(cbId, o.toString());
+                return;
+            }
+            case "soloDebug": {
+                NWActivity ed = getEditor();
+                JSONObject d = new JSONObject();
+                d.put("editor", ed != null);
+                d.put("pump", soloPumpRunning);
+                d.put("ticks", soloPumpTicks);
+                d.put("pending", pendingSoloLoad != null);
+                d.put("js", soloPumpReport == null ? "" : soloPumpReport);
+                reply(cbId, d.toString());
+                return;
+            }
 
             /* ---------- SOLO 舞台 / 脱离舞台 ---------- */
             case "soloStageReady": case "detachedStageReady": {
+                if ("soloStageReady".equals(method)) startSoloFramePump();
                 reply(cbId, ok());
                 return;
             }
@@ -1383,6 +1525,12 @@ public class BridgeHub {
                         pendingInitialFile = uri;
                         WindowActivity.show(activity, "editor", null);
                         o = new JSONObject().put("result", "opened");
+                    } else if ("solo-pick".equals(p.kind)) {
+                        // SOLO 页面靠 type 判定工程种类：侧边栏舞台缩略图只在
+                        // sb3 工程时显示；实际类型按扩展名复核（选择器是 */*）
+                        String nm = h.name == null ? "" : h.name.toLowerCase(java.util.Locale.ROOT);
+                        String type = nm.endsWith(".js") ? "js" : "sb3";
+                        o.put("type", type);
                     }
                     reply(p.cbId, o.toString());
                     return;
@@ -1703,9 +1851,45 @@ public class BridgeHub {
      * 编辑器服务端请求 hub
      * ============================================================ */
 
+    /** 宿主 editor 未就绪时暂存的 hub 请求（宿主页面 bridge.js 就绪后拉取重投） */
+    private static final java.util.concurrent.ConcurrentLinkedQueue<String> pendingEditorReqs =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+
     public void requestEditor(String fromType, String reqType, JSONObject payload, String cbId, long timeoutMs) {
         NWActivity ed = getEditor();
-        if (ed == null) { reply(cbId, jstr(null)); return; }
+        if (ed == null) {
+            // 宿主缺失：暂存请求并补建宿主。此前直接 reply null——SOLO 的所有
+            // 工具调用在宿主没起来/已被关闭时全部静默失败（AI 眼里「无法调用
+            // 任何 tool」）。宿主起来后由 soloPullPendingEditorReqs 重投，
+            // 结果经 hubRespond 直达发起方回调。
+            String key = cbId + "@" + System.nanoTime();
+            try {
+                JSONObject p = new JSONObject();
+                p.put("fromType", fromType);
+                p.put("reqType", reqType);
+                p.put("payload", payload);
+                p.put("cbId", cbId);
+                p.put("timeoutMs", timeoutMs);
+                p.put("key", key);
+                if (pendingEditorReqs.size() < 50) pendingEditorReqs.add(p.toString());
+            } catch (Exception ignored) {}
+            NWActivity src = findFirstByType(fromType);
+            if (src != null) ensureEditorHost(src);
+            // 兜底：宿主迟迟没起来时把暂存请求作废并回 null，避免发起方 Promise 永挂
+            final String cbF = cbId;
+            main.postDelayed(() -> {
+                for (String s : pendingEditorReqs) {
+                    try {
+                        if (new JSONObject(s).optString("key").equals(key)) {
+                            pendingEditorReqs.remove(s);
+                            reply(cbF, jstr(null));
+                            break;
+                        }
+                    } catch (Exception ignored2) {}
+                }
+            }, 30000);
+            return;
+        }
         String rid = rid(cbId);
         PendingHub ph = new PendingHub();
         ph.fromType = fromType;
@@ -1720,6 +1904,14 @@ public class BridgeHub {
                 reply(cbId, jstr(null));
             }
         }, timeoutMs);
+    }
+
+    /** 确保 SOLO 宿主编辑器存在；缺失时补建透明隐形宿主（窗口透明 + 触摸
+     *  穿透 + 不抢焦点），即使压到栈顶抢前台也不产生任何视觉/交互变化——
+     *  用户看到的一直是 SOLO，不再跳转到 Scratch 编辑器界面。 */
+    private void ensureEditorHost(NWActivity caller) {
+        if (caller == null || getEditor() != null) return;
+        WindowActivity.showSoloHost(caller);
     }
 
     /** 编辑器窗口回传 hub 请求结果 → 直达发起方回调 */
@@ -3028,6 +3220,117 @@ public class BridgeHub {
         // SOLO 保存：当前无后台工程宿主，提示
         toast(caller, "SOLO 工程保存：请先在主页打开一个项目");
         reply(cbId, jstr(null));
+    }
+
+    /* SOLO AI create_project：真正创建并落盘一个空工程，避免只改内存 chip、
+       用户却不知道项目存到哪。写到应用专属外部目录 Documents/NeoWarp/（
+       Android 11+ 无需存储权限），生成最小 sb3（zip 包 + project.json），
+       注册成 handle 供后续加载/保存，返回含可读路径的工程信息给 SOLO 页。 */
+    /* ── SOLO 舞台帧泵 ──
+       宿主编辑器被 solo 全屏覆盖后 Activity 进入 stopped 态，WebView 的
+       requestAnimationFrame 停摆，GUI 渲染循环（rAF 驱动 renderer.draw）
+       不再执行，requestSnapshot 的回调因此永远不触发——舞台窗口永远
+       "Waiting for stage…"。GL 命令提交与页面可见性无关，且 evaluateJs
+       在后台 WebView 照常执行：这里用 Handler 定时给宿主发 pulse，由
+       JS 侧 __nw.soloPump 同步驱动一帧渲染并推给舞台窗口/缩略图。 */
+    private static final int SOLO_PUMP_INTERVAL_MS = 125;
+    private boolean soloPumpRunning = false;
+    private int soloPumpTicks = 0;
+    /** editor JS 上报的泵统计（诊断用）：vm 是否可见、draw/帧计数、最近错误 */
+    private static volatile String soloPumpReport = null;
+    /* SOLO 舞台帧槽：editor 持续覆盖写，舞台窗口/SOLO 缩略图轮询拉取。
+       大 dataURL 的 __nw.evt evaluateJavascript 投递在真机上不可靠
+       （诊断显示 749 帧 0 到达，而 cb 小消息通道正常），改走轮询。 */
+    private static final java.util.concurrent.ConcurrentHashMap<String, String> soloSlots = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.concurrent.ConcurrentHashMap<String, Long> soloSlotSeqs = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void storeSoloStage(String slot, String json) {
+        if (slot == null || json == null) return;
+        soloSlots.put(slot, json);
+        Long cur = soloSlotSeqs.get(slot);
+        soloSlotSeqs.put(slot, cur == null ? 1L : cur + 1);
+    }
+    /** 宿主未就绪时暂存的 solo-load-project 投递，宿主起来后由泵/拉取补投 */
+    private volatile JSONObject pendingSoloLoad = null;
+    private final Runnable soloPumpRunnable = new Runnable() {
+        @Override public void run() {
+            NWActivity ed = getEditor();
+            if (ed == null) {
+                // 宿主不存在：若 SOLO 窗口还在（可能随后补建宿主）就继续等，否则停泵
+                if (findFirstByType("solo") != null || findFirstByType("solo-stage") != null) {
+                    main.postDelayed(this, SOLO_PUMP_INTERVAL_MS);
+                } else {
+                    soloPumpRunning = false;
+                }
+                return;
+            }
+            soloPumpTicks++;
+            ed.evaluateJs("window.__nw && window.__nw.soloPump && window.__nw.soloPump()");
+            main.postDelayed(this, SOLO_PUMP_INTERVAL_MS);
+        }
+    };
+
+    /** 启动舞台帧泵（幂等）。SOLO 工程创建/加载、舞台窗口打开时调用。 */
+    public void startSoloFramePump() {
+        if (soloPumpRunning) return;
+        soloPumpRunning = true;
+        main.postDelayed(soloPumpRunnable, SOLO_PUMP_INTERVAL_MS);
+    }
+
+    private void createSoloProject(String cbId, String name, String type, String content) {
+        try {
+            String safe = name == null ? "Untitled" : name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+            if (safe.isEmpty()) safe = "Untitled";
+            File dir = new File(app.getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS), "NeoWarp");
+            if (!dir.exists() && !dir.mkdirs()) throw new IOException("mkdirs failed: " + dir);
+            // js 工程落盘为 .js 源码文件（write_js_file 后续直接覆盖此文件），
+            // 不再像旧实现那样一律生成 sb3
+            boolean isJs = "js".equalsIgnoreCase(type);
+            String ext = isJs ? ".js" : ".sb3";
+            String fileName = safe + ext;
+            File target = new File(dir, fileName);
+            int dup = 1;
+            while (target.exists()) {
+                fileName = safe + "_" + (dup++) + ext;
+                target = new File(dir, fileName);
+            }
+
+            if (isJs) {
+                String src = content == null ? "" : content;
+                if (src.trim().isEmpty()) {
+                    src = "// NeoWarp JS 工程: " + safe + "\n"
+                        + "// 由 SOLO AI 创建。write_js_file 工具会覆盖整个文件。\n\n"
+                        + "(function () {\n  'use strict';\n\n})();\n";
+                }
+                java.nio.file.Files.write(target.toPath(), src.getBytes(StandardCharsets.UTF_8));
+            } else {
+                // 最小 Scratch 3.0 空工程（只有舞台，无 costumes；scratch-vm 可加载）
+                String projectJson = "{\"targets\":[{\"isStage\":true,\"name\":\"Stage\","
+                    + "\"variables\":{},\"lists\":{},\"broadcasts\":{},\"blocks\":{},\"comments\":{},"
+                    + "\"currentCostume\":0,\"costumes\":[],\"sounds\":[],\"volume\":100,\"layerOrder\":0,"
+                    + "\"tempo\":60,\"videoTransparency\":50,\"videoState\":\"on\",\"textToSpeechLanguage\":null}],"
+                    + "\"monitors\":[],\"extensions\":[],"
+                    + "\"meta\":{\"semver\":\"3.0.0\",\"vm\":\"0.2.0\",\"agent\":\"\"}}";
+                try (ZipOutputStream zos = new ZipOutputStream(new java.io.FileOutputStream(target))) {
+                    zos.putNextEntry(new ZipEntry("project.json"));
+                    zos.write(projectJson.getBytes(StandardCharsets.UTF_8));
+                    zos.closeEntry();
+                }
+            }
+
+            Uri uri = Uri.fromFile(target);
+            FileHandle h = registerHandle(uri, isJs ? fileName : safe);
+            JSONObject o = new JSONObject();
+            o.put("id", handleId(h));
+            o.put("name", safe);
+            o.put("type", isJs ? "js" : "sb3");
+            o.put("path", target.getAbsolutePath());
+            o.put("uri", uri.toString());
+            if (!isJs) startSoloFramePump(); // js 工程没有舞台画面流
+            reply(cbId, o.toString());
+        } catch (Exception e) {
+            reply(cbId, jstr(null));
+        }
     }
 
     /* handleActivityResult 里 save-text / save-image / save 补充处理 */

@@ -29,13 +29,20 @@ public abstract class NWActivity extends AppCompatActivity {
     /** 窗口类型：editor / home / task-manager / ... （与 bridge.js 的 WIN_TYPE 一致） */
     protected String windowType = "editor";
 
+    /** 是否为 SOLO 透明隐形宿主（仅 WindowActivity 的宿主实例返回 true） */
+    public boolean isSoloHost() {
+        return false;
+    }
+
     protected WebView webView;
 
     /** 内容是否延伸到系统栏（状态栏/导航栏）后方，主页全屏铺满用 */
     protected boolean extendIntoStatusBar() { return false; }
 
-    /** 系统栏：edge 窗口透明铺满（背景全屏），其余按主题染色 */
+    /** 系统栏：edge 窗口透明铺满（背景全屏），其余按主题染色。
+     *  SOLO 透明隐形宿主跳过：必须始终保持全透明。 */
     protected void applySystemBarTheme() {
+        if (isSoloHost()) return;
         runOnUiThread(() -> {
             boolean dark = BridgeHub.isDarkTheme(this);
             int color = dark ? 0xFF0A0A0D : 0xFFF2F2F7;
@@ -92,7 +99,11 @@ public abstract class NWActivity extends AppCompatActivity {
 
     @SuppressLint("SetJavaScriptEnabled")
     protected WebView createWebView() {
-        applySystemBarTheme(); // 需在 setContentView 前生效的 flags 在内部处理
+        if (isSoloHost()) {
+            // 透明隐形宿主：不染色系统栏（保持透明，避免前台化时状态栏闪色）
+        } else {
+            applySystemBarTheme(); // 需在 setContentView 前生效的 flags 在内部处理
+        }
         webView = new WebView(this);
         WebSettings s = webView.getSettings();
         s.setJavaScriptEnabled(true);
@@ -115,6 +126,12 @@ public abstract class NWActivity extends AppCompatActivity {
         webView.setWebChromeClient(new BridgeWebChromeClient(this));
         webView.addJavascriptInterface(new NeoWarpBridge(this, windowType), "NeoWarpAndroid");
         webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+        if (isSoloHost()) {
+            // 宿主内容必须完全不可见：透明窗口下 WebView 若可见，用户会看到
+            // 编辑器画面"覆盖"在 SOLO 之上。INVISIBLE 不影响 Chromium 内部
+            // 渲染（JS/rAF/draw/toDataURL 照常），帧泵与工具链路不受影响。
+            webView.setVisibility(View.INVISIBLE);
+        }
         // 输入法兜底：WebView 必须持有可触摸焦点，软键盘才会随页面内的
         // 焦点变化弹出（扩展编辑器 monaco 代码区此前点不出键盘的部分根因）
         webView.setFocusable(true);
@@ -137,6 +154,16 @@ public abstract class NWActivity extends AppCompatActivity {
 
         setContentView(webView, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (isSoloHost()) {
+            // 透明 + 触摸穿透 + 不抢焦点：宿主即使在前台，用户的触摸与系统返回
+            // 手势都直达下面的 SOLO 窗口，视觉上完全不感知宿主的存在
+            android.view.Window w = getWindow();
+            w.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(0x00000000));
+            w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                    | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE);
+            w.setStatusBarColor(0x00000000);
+            w.setNavigationBarColor(0x00000000);
+        }
         BridgeHub.get(this).registerWindow(this);
         return webView;
     }
@@ -172,6 +199,29 @@ public abstract class NWActivity extends AppCompatActivity {
     public void onBackPressed() {
         if (webView != null && webView.canGoBack() && !BridgeHub.isModalWindow(windowType)) {
             webView.goBack();
+            return;
+        }
+        // SOLO 全屏窗口：直接回到主页。透明宿主一并收掉（它压在主页之上，
+        // SOLO finish 后会露出它）；用户手动打开的编辑器不收（那是用户自己的窗口）。
+        // 先 finish 被覆盖的宿主再 finish 自己：露出主页而不是编辑器。
+        if ("solo".equals(windowType)) {
+            NWActivity host = BridgeHub.get(this).getEditor();
+            if (host instanceof WindowActivity && ((WindowActivity) host).isSoloHost()
+                    && !host.isFinishing()) {
+                host.finish();
+            }
+            finish();
+            return;
+        }
+        // SOLO 透明隐形宿主：返回即自我关闭，露出下层窗口（通常是 SOLO）。
+        // 宿主是 NOT_FOCUSABLE 的，系统返回一般不会派发到这里，此为兜底。
+        if ("editor".equals(windowType) && isSoloHost()) {
+            finish();
+            return;
+        }
+        // 主页：退到桌面而不 finish（finish 会让任务栈只剩后台窗口）
+        if ("home".equals(windowType)) {
+            moveTaskToBack(true);
             return;
         }
         // 编辑器类窗口且有未保存改动 -> 弹确认框；用户确认后由对话框驱动关闭
@@ -213,6 +263,26 @@ public abstract class NWActivity extends AppCompatActivity {
             if (isFinishing() || isDestroyed()) return;
             if (webView != null && webView.canGoBack() && !BridgeHub.isModalWindow(windowType)) {
                 webView.goBack();
+                return;
+            }
+            // SOLO 全屏窗口：直接回到主页，透明宿主一并收掉（同 onBackPressed）
+            if ("solo".equals(windowType)) {
+                NWActivity host = BridgeHub.get(this).getEditor();
+                if (host instanceof WindowActivity && ((WindowActivity) host).isSoloHost()
+                        && !host.isFinishing()) {
+                    host.finish();
+                }
+                finish();
+                return;
+            }
+            // SOLO 透明隐形宿主：返回即自我关闭（同 onBackPressed 兜底）
+            if ("editor".equals(windowType) && isSoloHost()) {
+                finish();
+                return;
+            }
+            // 主页：退到桌面，不 finish
+            if ("home".equals(windowType)) {
+                moveTaskToBack(true);
                 return;
             }
             if (!BridgeHub.get(this).requestCloseIfDirty(this)) {

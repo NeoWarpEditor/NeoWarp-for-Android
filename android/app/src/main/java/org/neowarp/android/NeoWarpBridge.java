@@ -79,6 +79,15 @@ public class NeoWarpBridge {
         BridgeHub.get(activity).forwardToWindow(windowType, targetType, event, json);
     }
 
+    /* ---------- SOLO 舞台帧槽（轮询通道） ----------
+       大 dataURL 的帧经 __nw.evt 拼接进 evaluateJavascript 在真机上
+       不可靠（诊断：宿主 749 帧 0 到达，而 cb 小消息通道正常），帧槽
+       轮询让窗口主动拉取，负载走已被证明可靠的 cb 回复通道。 */
+    @JavascriptInterface
+    public void soloStore(String slot, String json) {
+        BridgeHub.get(activity).storeSoloStage(slot, json);
+    }
+
     @JavascriptInterface
     public void log(String message) {
         android.util.Log.d("NeoWarp", String.valueOf(message));

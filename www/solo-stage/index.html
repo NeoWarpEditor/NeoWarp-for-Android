@@ -511,6 +511,29 @@
             });
 
             SoloStagePreload.ready();
+
+            /* 诊断：画面迟迟不出时，把宿主/泵/VM 链路状态直接显示在提示
+               文本里，取代笼统的 "Waiting for stage…"。首帧到达后 hint
+               已隐藏，轮询自动静默，正常使用时零干扰。 */
+            setInterval(function () {
+                if (!window.SoloStagePreload || !SoloStagePreload.debug) return;
+                if (!hint || hint.classList.contains('hidden')) return;
+                SoloStagePreload.debug().then(function (d) {
+                    if (!d || !hint || hint.classList.contains('hidden')) return;
+                    var js = {};
+                    try { js = typeof d.js === 'string' && d.js ? JSON.parse(d.js) : (d.js || {}); } catch (e) {}
+                    var parts = [
+                        'host:' + (d.editor ? 'Y' : 'N'),
+                        'pump:' + (d.pump ? 'Y' : 'N') + '/' + (d.ticks || 0),
+                        'pend:' + (d.pending ? 'Y' : 'N'),
+                        'vm:' + (js.vmSeen ? 'Y' : 'N'),
+                        'draw:' + (js.drawOk || 0),
+                        'f:' + (js.frames || 0)
+                    ];
+                    if (js.err) parts.push('err:' + String(js.err).slice(0, 60));
+                    hint.textContent = parts.join('  ');
+                }).catch(function () {});
+            }, 2000);
         })();
     </script>
 </body>

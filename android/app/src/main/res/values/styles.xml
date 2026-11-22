@@ -33,4 +33,19 @@
         <item name="android:windowActionBar">false</item>
         <item name="colorAccent">@color/colorAccent</item>
     </style>
+
+    <!-- SOLO 透明隐形宿主：AI 工具调用与舞台画面流需要一个后台编辑器宿主窗口。
+         透明 + 无进场动画 + WebView INVISIBLE + FLAG_NOT_TOUCHABLE/NOT_FOCUSABLE，
+         补建时压入任务栈也不产生任何视觉/交互变化——用户看到的一直是 SOLO。
+         windowIsTranslucent 还保证下层 SOLO 不会进入 stopped 态（rAF 持续）。 -->
+    <style name="AppTheme.TranslucentHost" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentTransitions">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:windowActionBar">false</item>
+    </style>
 </resources>

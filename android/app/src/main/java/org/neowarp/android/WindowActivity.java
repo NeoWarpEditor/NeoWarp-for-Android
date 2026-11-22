@@ -18,6 +18,11 @@ public class WindowActivity extends NWActivity {
 
     private static final String EXTRA_TYPE = "nw.type";
     private static final String EXTRA_PAYLOAD = "nw.payload";
+    private static final String EXTRA_SOLO_HOST = "nw.soloHost";
+
+    /** SOLO 透明隐形宿主模式：窗口透明、WebView 不可见、触摸穿透、不抢焦点。
+     *  补建时即使压到栈顶也不产生任何视觉/交互变化，用户看到的一直是 SOLO。 */
+    private boolean soloHostMode = false;
 
     /** 以浮动卡片形式叠在编辑器之上的窗口（对应桌面版的非模态小窗）。
      *  SOLO 是全屏 AI 编程窗口，不在此列——须占满整屏，而非缩小成卡片。 */
@@ -55,6 +60,20 @@ public class WindowActivity extends NWActivity {
         ctx.startActivity(i);
     }
 
+    /** 打开 SOLO 透明隐形宿主（仅当不存在时）：见 AppTheme.TranslucentHost 注释。
+     *  透明宿主不抢视觉/焦点，无需任何"前置回去"补偿逻辑。 */
+    public static void showSoloHost(Context ctx) {
+        NWActivity existing = BridgeHub.get(ctx).findFirstByType("editor");
+        if (existing != null) return; // 已有（透明宿主或用户手动打开的编辑器）
+        Intent i = new Intent(ctx, WindowActivity.class);
+        i.putExtra(EXTRA_TYPE, "editor");
+        i.putExtra(EXTRA_SOLO_HOST, true);
+        if (!(ctx instanceof android.app.Activity)) {
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        ctx.startActivity(i);
+    }
+
     /** 强制新建一个窗口（不复用已有同类型实例），用于编辑器「新窗口」菜单项。
      *  「新窗口」语义 = 再开一个独立编辑器，和当前窗口分属两个任务栈：
      *  最近任务里显示成两个独立条目，返回键不会退回原编辑器，两者互不干扰。 */
@@ -72,6 +91,11 @@ public class WindowActivity extends NWActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         String type = getIntent().getStringExtra(EXTRA_TYPE);
         if (type == null) type = "home";
+        soloHostMode = getIntent().getBooleanExtra(EXTRA_SOLO_HOST, false);
+        if (soloHostMode) {
+            // 透明宿主主题必须在 super.onCreate 之前设置
+            setTheme(R.style.AppTheme_TranslucentHost);
+        }
         if (isFloatingType(type)) {
             // 浮动卡片主题必须在 super.onCreate 之前设置
             setTheme(R.style.AppTheme_Floating);
@@ -88,6 +112,11 @@ public class WindowActivity extends NWActivity {
         registerBackGestureCallback();
 
         loadMain();
+    }
+
+    @Override
+    public boolean isSoloHost() {
+        return soloHostMode;
     }
 
     /** 浮动窗口尺寸：居中卡片（需在窗口获得焦点后设置才生效） */
