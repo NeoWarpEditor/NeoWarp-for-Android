@@ -758,7 +758,21 @@
 
   if (Preload.onFocusChat) {
     Preload.onFocusChat(function () {
-      if (el.viewChat.classList.contains('visible')) el.chatInput.focus();
+      // 会话已建立但视图停在表单（例如窗口被复用）：先切回聊天再聚焦输入框
+      if (!el.viewChat.classList.contains('visible') && state.role) {
+        enterChat({
+          role: state.role,
+          selfName: state.selfName,
+          selfAvatar: state.selfAvatar,
+          hostName: state.hostName,
+          hostAvatar: el.roomAvatar.textContent || '🏠',
+          onlineCount: state.onlineCount,
+          members: state.members,
+          emptyText: ''
+        });
+      } else {
+        el.chatInput.focus();
+      }
     });
   }
 
@@ -795,9 +809,35 @@
 
   refreshComposer();
 
+  /* 从编辑器工具栏「在线人数」进来的窗口 mode='chat'：这不是一个新会话，
+     而是查看已有会话的聊天。拉 Java 侧会话快照直接进聊天视图，绝不能落到
+     「加入协作」表单（那样会误以为还没进房间）。 */
+  function restoreChatFromSession () {
+    if (!Preload.getSession) { showView('join'); runDiscovery(); return; }
+    Preload.getSession().then(function (session) {
+      if (session && session.role) {
+        enterChat({
+          role: session.role,
+          selfName: session.selfName || session.username || '',
+          selfAvatar: session.selfAvatar || session.avatar || '👤',
+          hostName: session.hostName || '主机',
+          hostAvatar: session.hostAvatar || '🏠',
+          onlineCount: session.onlineCount || 1,
+          members: session.members,
+          emptyText: '协作会话已恢复，在这里和其他人聊天。'
+        });
+      } else {
+        showView('join');
+        runDiscovery();
+      }
+    }).catch(function () { showView('join'); runDiscovery(); });
+  }
+
   Preload.getMode().then(function (mode) {
     state.mode = mode;
-    if (mode === 'host') {
+    if (mode === 'chat') {
+      restoreChatFromSession();
+    } else if (mode === 'host') {
       showView('host');
       setTimeout(function () { el.hostPassword.focus(); }, 120);
     } else {

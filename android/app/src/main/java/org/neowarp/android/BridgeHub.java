@@ -94,6 +94,8 @@ public class BridgeHub {
     private JSONObject collabPermissions = null;
     private String collabHostName = "主机";
     private String collabHostAvatar = "🏠";
+    /** join 会话的认证结果快照：协作聊天窗被系统回收后重建时据此恢复聊天视图 */
+    private volatile JSONObject collabJoinInfo = null;
     /** host 模式下编辑器最新工程的权威载荷（{format:'sb3',data:...} JSON 字符串） */
     private volatile String collabRoomProject = null;
 
@@ -480,6 +482,16 @@ public class BridgeHub {
                    继续存活）。宿主已存在则只开 solo。 */
                 if ("solo".equals(type) && caller != null && BridgeHub.get(caller).getEditor() == null) {
                     WindowActivity.showSoloHost(caller);
+                }
+                /* 编辑器工具栏「在线人数」走 mode='chat'：对齐桌面版 focusChat——
+                   只前置已存在的协作聊天窗并让它切到 chat，绝不新建窗口。
+                   新建会带 mode='chat' 打开一个新协作页，而页面 getMode 只认
+                   host/join，chat 落到 else 显示「加入协作」表单（本 bug 根因）。
+                   没有活跃会话时桌面版同样什么都不做。 */
+                if ("collaboration".equals(type) && "chat".equals(payload == null ? null : payload.optString("mode"))) {
+                    focusCollabChat();
+                    reply(cbId, "{\"success\":true}");
+                    return;
                 }
                 /* 协作是浮动聊天窗，底层需要一个可见编辑器承载工程（权威源 /
                    接收对端工程后 apply）。host-from-file 路径已单独拉起编辑器，
@@ -980,6 +992,31 @@ public class BridgeHub {
                 String mode = "host";
                 try { mode = new JSONObject(payload == null ? "{}" : payload).optString("mode", "host"); } catch (Exception ignored) {}
                 reply(cbId, jstr(mode));
+                return;
+            }
+            /* 供协作聊天窗重建时恢复会话：点「在线人数」应直接进聊天，
+               而不是回到 host/join 表单。返回当前活跃会话的展示数据。 */
+            case "collabGetSession": {
+                try {
+                    CollabEngine.Host h = collabHost;
+                    CollabEngine.Join j = collabJoin;
+                    if (h != null) {
+                        JSONObject o = new JSONObject()
+                                .put("role", "host")
+                                .put("selfName", collabHostName)
+                                .put("selfAvatar", collabHostAvatar)
+                                .put("hostName", collabHostName)
+                                .put("hostAvatar", collabHostAvatar)
+                                .put("onlineCount", h.getTotalOnlineCount())
+                                .put("members", h.getRoster());
+                        reply(cbId, o.toString());
+                    } else if (j != null && collabJoinInfo != null) {
+                        JSONObject o = new JSONObject(collabJoinInfo.toString()).put("role", "participant");
+                        reply(cbId, o.toString());
+                    } else {
+                        reply(cbId, "null");
+                    }
+                } catch (Exception e) { reply(cbId, "null"); }
                 return;
             }
             case "collabGetLocalIP": { reply(cbId, jstr(localIP())); return; }
@@ -2020,6 +2057,24 @@ public class BridgeHub {
         if (w != null) w.evaluateJs("__nw.evt('collab'," + jq(event) + "," + jqRaw(data) + ")");
     }
 
+    /** 编辑器点「在线人数」：前置已存在的协作聊天窗（桌面版 focusChat 语义），
+     *  绝不新建窗口。窗口若不存在但仍有活跃会话（被系统回收等），重建一个
+     *  协作窗并靠 collabGetSession 恢复聊天视图；否则不做任何事。 */
+    private void focusCollabChat() {
+        NWActivity w = findFirstByType("collaboration");
+        if (w != null) {
+            WindowActivity.show(w, "collaboration", null); // REORDER_TO_FRONT 前置
+            w.evaluateJs("__nw.evt('collab','focus-chat',null)");
+            return;
+        }
+        if (collabHost == null && collabJoin == null) return; // 无会话：与桌面版一致，忽略
+        NWActivity caller = getEditor();
+        if (caller == null) caller = findFirstByType("home");
+        if (caller != null) {
+            WindowActivity.show(caller, "collaboration", "{\"mode\":\"chat\"}");
+        }
+    }
+
     /** 向编辑器推协作状态（role/onlineCount/permissions） */
     private void collabEditorState(boolean active, String role, int online, JSONObject perms) {
         try {
@@ -2101,6 +2156,7 @@ public class BridgeHub {
                             .put("hostName", authResult.optString("hostName", "主机"))
                             .put("hostAvatar", authResult.optString("hostAvatar", "🏠"))
                             .put("members", authResult.opt("members"));
+                    collabJoinInfo = o; // 供聊天窗重建时恢复（含 role 由页面按 join 处理）
                     collabUIEvent("join-connected", o);
                     collabEditorState(true, "participant", authResult.optInt("onlineCount", 1),
                             authResult.optJSONObject("permissions"));
@@ -2182,6 +2238,7 @@ public class BridgeHub {
         CollabEngine.Join j = collabJoin;
         collabHost = null;
         collabJoin = null;
+        collabJoinInfo = null;
         collabRoomProject = null;
         if (h != null) { try { h.end(); } catch (Exception ignored) {} }
         if (j != null) { try { j.close(); } catch (Exception ignored) {} }

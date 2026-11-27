@@ -1103,10 +1103,10 @@
         PV + '.blocklyZoom{transform:translate(6px,var(--nw-zoom-y)) !important}',
         /* 纵向排列坐标分区：分类列与抽屉压到上方 2/5（高度 --nw-top-h 由 JS
            按 injectionDiv 实际高度写入），代码画布移到下方 3/5 横跨全宽。
-           抽屉宽度铺满由 JS 覆盖 flyout.getWidth() 实现；这里只管高度与溢出，
-           !important 压过 toolbox.position() 写下的内联 height:100%。 */
-        PV + '.blocklyToolboxDiv{height:var(--nw-top-h,184px) !important;'
-          + 'max-height:var(--nw-top-h,184px) !important;overflow-y:auto !important}',
+           抽屉宽度铺满由 JS 覆盖 flyout.getWidth() 实现。
+           图三改版：toolbox 高度不再锁在 flyout 区（内容自适应 + 扩展按钮
+           跟随卡片正下方），高度/max-height 移交给下方图三规则；这里只留滚动。 */
+        PV + '.blocklyToolboxDiv{overflow-y:auto !important}',
         PV + '.blocklyFlyout{overflow:hidden !important}',
         /* 颜色全部沿用 TurboWarp 主题原生色：深色主题下 toolbox / flyout / 画布
            同为 #111111，浅色主题下同为白系，天然协调。之前硬编码 #f1f2f6 浅灰
@@ -1221,7 +1221,319 @@
 
         /* 横屏：新增的舞台按钮 / 工具栏添加按钮必须消失（其余规则已由 html.nw-portrait 限定） */
         'html:not(.' + CLS + ') .nw-stage-btn{display:none !important}',
-        'html:not(.' + CLS + ') .nw-add-btn, html:not(.' + CLS + ') .nw-add-menu{display:none !important}'
+        'html:not(.' + CLS + ') .nw-add-btn, html:not(.' + CLS + ') .nw-add-menu{display:none !important}',
+
+        /* ================================================================
+           (12) 图一重设计覆盖层（用户手绘设计稿）——只改视觉，不动布局引擎
+             · 页面纯黑底，积木面板 / 代码区为悬浮圆角卡片（间隙由 flyout JS
+               patch 提供，圆角由 clip-path 裁出）
+             · 顶部：胶囊分段 Tab（无图标无下划线）+ 🔍搜索胶囊 + 舞台胶囊
+             · 分类列：大圆点 + 小字、透明背景
+             · 书包并入卡片语言；属性栏重排（显示/隐藏移到最后）
+             · 底部工具栏圆角灰条；扩展按钮改蓝色圆形、钉在积木卡片左下
+           ================================================================ */
+        /* 主题变量：深色 = 图一配色；浅色 = Apple 灰白对应
+           --nw-pill：tab 组底 / 搜索框 / 舞台按钮共享的中灰（图三）
+           --nw-pill-active：选中 tab 的内缩深灰胶囊（图三，高度小于组底） */
+        P0 + '{--nw-bg:#000;--nw-card:#232326;--nw-card2:#2e2e33;--nw-pill:#3a3a40;'
+          + '--nw-pill-active:#2b2b31;--nw-text:#fff;--nw-dim:rgba(255,255,255,.62);'
+          + '--nw-line:rgba(255,255,255,.09);--nw-zoom:#3a3a40}',
+        P0 + '[data-nw-ui="light"]{--nw-bg:#f2f2f7;--nw-card:#fff;--nw-card2:#fff;'
+          + '--nw-pill:#e7e7ec;--nw-pill-active:#ffffff;--nw-text:#111;'
+          + '--nw-dim:rgba(60,60,67,.55);--nw-line:rgba(0,0,0,.09);--nw-zoom:#d5d5dc}',
+
+        /* 页面底色 + 各容器透明化（卡片自带底色） */
+        P + '[class*="gui_page-wrapper_"], ' + P + '[class*="gui_body-wrapper_"], '
+          + P + '[class*="gui_editor-wrapper_"], ' + P + '[class*="gui_flex-wrapper_"], '
+          + P + '[class*="gui_tab-panel_"], ' + P + '[class*="gui_stage-and-target-wrapper_"], '
+          + P + '[class*="gui_target-wrapper_"], ' + P + '[class*="target-pane_target-pane_"], '
+          + P + '[class*="gui_blocks-wrapper_"], ' + P + '[class*="blocks_blocks_"], '
+          + P + '[class*="injectionDiv"], ' + P + '.blocklySvg, ' + P + 'body{'
+          + 'background:var(--nw-bg) !important}',
+
+        /* ---- 顶部 Tab 条：胶囊分段控件（图三）----
+           三个 tab 共享一块中灰胶囊底（::before）；选中的 tab 是内缩的
+           深灰胶囊——高度 28px 小于组底 34px（上下各缩 3px），文字白色；
+           tab 区左右各留 16px，组底左右各留 6px，视觉与图三一致。
+           搜索框/舞台按钮是 tab-list 的 fixed 子元素，不能给 ul 整体上背景 */
+        P + '[class*="gui_tab-list_"]{background:transparent !important;'
+          + 'padding:0 calc(var(--nw-vw,360px) * 0.46 + 16px) 0 16px !important;gap:6px !important}',
+        P + '[class*="gui_tab-list_"]::before{content:"" !important;'
+          + 'position:absolute !important;left:6px !important;top:4px !important;'
+          + 'height:34px !important;width:calc(100% - var(--nw-vw,360px) * 0.46 - 12px) !important;'
+          + 'border-radius:17px !important;background:var(--nw-pill) !important;z-index:0 !important}',
+        /* 选中胶囊 = 独立滑动指示器（::after）：切换选项时深色圆角矩形
+           以非线性缓动滑到目标 tab，而不是各自生灭（图三效果 + 过渡动画）。
+           位置由 JS 写 --nw-ind-x / --nw-ind-w（MutationObserver 盯 class）；
+           tab 自身只改文字色。::after 绘制在组底（::before）之上、文字之下 */
+        P + '[class*="gui_tab-list_"]::after{content:"" !important;'
+          + 'position:absolute !important;left:var(--nw-ind-x, 16px) !important;'
+          + 'top:7px !important;width:var(--nw-ind-w, 72px) !important;height:28px !important;'
+          + 'border-radius:14px !important;background:var(--nw-pill-active) !important;'
+          + 'z-index:0 !important;'
+          + 'transition:left .28s cubic-bezier(.3,.7,.25,1), width .28s cubic-bezier(.3,.7,.25,1) !important}',
+        /* tab 图标（Scratch logo / 画笔 / 喇叭）按图一移除，纯文字 */
+        P + '[class*="gui_tab_"] img{display:none !important}',
+        P + '.react-tabs__tab, ' + P + '[class*="gui_tab_"]{'
+          + 'flex:1 1 0 !important;height:28px !important;line-height:28px !important;'
+          + 'margin:0 !important;padding:0 4px !important;'
+          + 'position:relative !important;z-index:1 !important;'
+          + 'background:transparent !important;color:var(--nw-text) !important;'
+          + 'font-size:13px !important;font-weight:600 !important;text-align:center !important;'
+          + 'border-radius:14px !important;border:0 !important;border-bottom:0 !important;}',
+        /* 选中态：文字保持白色，底色交给滑动指示器 */
+        P + '.react-tabs__tab--selected, ' + P + '[class*="gui_is-selected_gYgGm"]{'
+          + 'background:transparent !important;color:var(--nw-text) !important;'
+          + 'border-bottom:0 !important}',
+        P + '.react-tabs__tab--selected:hover{background:transparent !important}',
+        P + '.react-tabs__tab:hover{background:transparent !important;color:var(--nw-text) !important}',
+
+        /* 舞台按钮：与 tab 组等高（34px）的中灰胶囊 */
+        P + '.nw-stage-btn{left:auto !important;right:6px !important;top:4px !important;'
+          + 'width:44px !important;height:34px !important;line-height:34px !important;'
+          + 'border-radius:17px !important;background:var(--nw-pill) !important;'
+          + 'color:var(--nw-text) !important;font-size:13px !important;font-weight:600 !important}',
+
+        /* 查找框：🔍 搜索胶囊（位置由 layoutFindBar 动态测量写入）
+           图三：深灰底白字（与 tab 胶囊组同色），浅色主题自动切浅灰黑字 */
+        P + '.sa-find-bar{background:var(--nw-pill) !important;'
+          + 'border-radius:16px !important;border:0 !important;box-shadow:none !important;'
+          + 'margin:0 !important;align-items:center !important;'
+          + 'padding:0 10px 0 30px !important;'
+          + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'14\' height=\'14\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23ffffff\' stroke-width=\'2.4\' stroke-linecap=\'round\'><circle cx=\'10.5\' cy=\'10.5\' r=\'6.5\'/><line x1=\'15.5\' y1=\'15.5\' x2=\'20\' y2=\'20\'/></svg>") !important;'
+          + 'background-repeat:no-repeat !important;background-position:9px center !important}',
+        P0 + '[data-nw-ui="light"] .sa-find-bar{'
+          + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'14\' height=\'14\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23111111\' stroke-width=\'2.4\' stroke-linecap=\'round\'><circle cx=\'10.5\' cy=\'10.5\' r=\'6.5\'/><line x1=\'15.5\' y1=\'15.5\' x2=\'20\' y2=\'20\'/></svg>") !important}',
+        /* 「搜索」垂直居中根因：SA 原生把 label 相对 wrapper 上移（负偏移），
+           36px 的 input 顶出胶囊。整条链 flex + 等高对齐后文字必然居中；
+           input line-height 与高度一致，杜绝字体 fallback 基线漂移 */
+        P + '.sa-find-wrapper{display:flex !important;flex:1 1 auto !important;'
+          + 'width:auto !important;height:34px !important;min-height:34px !important;'
+          + 'align-items:center !important;margin:0 !important;padding:0 !important}',
+        P + '.sa-find-bar [class*="sa-find-dropdown-out"]{display:flex !important;'
+          + 'flex:1 1 auto !important;width:auto !important;height:34px !important;'
+          + 'min-height:34px !important;align-items:center !important;'
+          + 'position:relative !important;top:0 !important;'
+          + 'background:transparent !important;'
+          + 'border:0 !important;outline:0 !important;'
+          + 'border-radius:16px !important;box-shadow:none !important;'
+          + 'padding:0 !important;margin:0 !important}',
+        /* 聚焦时 SA 原生给 label 画 1px outline——搜索框内那圈椭圆边框的来源 */
+        P + '.sa-find-bar [class*="sa-find-dropdown-out"]:focus-within{outline:0 !important;border:0 !important}',
+        P + '.sa-find-bar input{background:transparent !important;border:0 !important;'
+          + 'border-radius:16px !important;box-shadow:none !important;outline:0 !important;'
+          + 'flex:1 1 auto !important;width:100% !important;min-width:0 !important;'
+          + 'height:34px !important;line-height:34px !important;padding:0 !important;'
+          + 'margin:0 !important;'
+          + 'color:var(--nw-text) !important;font-size:12px !important}',
+        /* focus 直角修复：TW input-form 聚焦时 4px 圆角 + 紫边框 + 外发光，
+           在 16px 胶囊里形成「圆角套直角」；聚焦态保持纯胶囊 */
+        P + '.sa-find-bar input:focus{border:0 !important;box-shadow:none !important;'
+          + 'outline:0 !important;background:transparent !important;border-radius:16px !important}',
+        P + '.sa-find-bar input::placeholder{color:var(--nw-dim) !important;font-weight:600}',
+        /* 内部 wrapper / 下拉容器也统一胶囊化，杜绝任何直角层露出；
+           label 的原生 4px padding 会把 input 顶出胶囊底部（文字偏下的根因） */
+        P + '.sa-find-bar [class*="sa-find-dropdown-out"]{background:transparent !important;'
+          + 'border:0 !important;border-radius:16px !important;box-shadow:none !important;'
+          + 'padding:0 !important;margin:0 !important}',
+        /* 查找下拉面板：胶囊外挂圆角卡片（:not 排除内部的 -out wrapper，
+           避免 [class*=] 前缀匹配把 wrapper 又铺上卡片底色） */
+        P + '.sa-find-bar [class*="sa-find-dropdown"]:not([class*="-out"]){'
+          + 'border-radius:14px !important;overflow:hidden !important;'
+          + 'background:var(--nw-card) !important;border:1px solid var(--nw-line) !important;'
+          + 'box-shadow:0 10px 30px rgba(0,0,0,.4) !important}',
+        /* 下拉面板挂在胶囊正下方（label 已 flex 化，ul 须绝对定位防挤占） */
+        P + '.sa-find-bar ul[class*="sa-find-dropdown"]{position:absolute !important;'
+          + 'left:0 !important;right:auto !important;top:calc(100% + 4px) !important;'
+          + 'min-width:220px !important;z-index:80 !important}',
+        /* 查找下拉面板配色 */
+        P + '.sa-find-bar [class*="find-bar_find-button_"]{background:transparent !important}',
+
+        /* ---- 积木分类列：圆角背景卡片 + 紧凑纵向排列（图二/图三）----
+           卡片与扩展按钮整体收进积木面板（flyout）高度内（--nw-tb-avail
+           由 layoutToolbox 按 flyout 底缘计算），分类多时卡片内部上下滚动；
+           Blockly 只用 toolbox 的 DOM 做视觉/点击，坐标计算走我们 patch 的
+           getMetrics（toolboxWidth/toolboxHeight 均为固定值），改高安全 */
+        P + '.blocklyToolboxDiv{background:var(--nw-card) !important;'
+          + 'border-right:0 !important;box-shadow:none !important;'
+          + 'border-radius:18px !important;height:auto !important;'
+          + 'max-height:var(--nw-tb-avail, 244px) !important;top:8px !important;'
+          + 'left:7px !important;width:52px !important;'
+          + 'padding:4px 0 6px !important;box-sizing:border-box !important;'
+          + 'overflow-y:auto !important;overflow-x:hidden !important;'
+          + '-webkit-overflow-scrolling:touch !important;scrollbar-width:none !important}',
+        P + '.blocklyToolboxDiv::-webkit-scrollbar{display:none !important}',
+        P + '.scratchCategoryMenu, .scratchCategoryMenuRow{background:transparent !important;'
+          + 'width:100% !important;box-sizing:border-box !important}',
+        /* TW 原生把 menu/row/item 写死 60px 宽，卡片只有 52px——内容整体
+           偏右 4px 且右缘被裁（真机上看起来「歪」）。强制跟随卡片宽度 */
+        P + '.scratchCategoryMenuItem{background:transparent !important;'
+          + 'width:100% !important;box-sizing:border-box !important;'
+          + 'padding:1px 0 2px !important;font-size:10px !important;line-height:13px !important;'
+          + 'color:var(--nw-text) !important;font-weight:600 !important;gap:2px !important}',
+        P + '.scratchCategoryMenuItem .scratchCategoryItemIcon, '
+          + P + '.scratchCategoryMenuItem .scratchCategoryItemBubble{'
+          + 'width:18px !important;height:18px !important}',
+        P + '.scratchCategoryMenuItem.categorySelected{background:transparent !important}',
+        P + '.scratchCategoryMenuItem.categorySelected .scratchCategoryMenuItemLabel{'
+          + 'color:var(--nw-text) !important;font-weight:700 !important}',
+        /* 图二：所有分类名白色（选中的加重），不再灰显 */
+        P + '.scratchCategoryMenuItemLabel{color:var(--nw-text) !important;font-weight:600 !important}',
+
+        /* ---- 积木面板 / 代码区：圆角卡片 ----
+           mainBackground rect 是 100%×100% 盖满 injectionDiv（含分类列背后）：
+           纵向排列下用 clip-path 裁掉上半（--nw-top-h），只留代码区卡片；
+           横向排列（左右分区）保持整块底色不裁，避免左上角露黑。
+           flyout 位置与间隙由 JS patch（x=68,y=8,h=topH-16），SVG path 裁圆角用 clip-path。 */
+        P + '.blocklyFlyoutBackground{fill:var(--nw-card) !important;stroke:none !important}',
+        PV + '.blocklyFlyoutBackground{clip-path:inset(0 round 16px) !important}',
+        P + '.blocklyMainBackground{fill:var(--nw-card) !important;stroke:none !important}',
+        /* 代码区卡片左右各留 12px 黑色边距（图一精致感）；只裁视觉，
+           拖拽交互区域不变，边缘 12px 内放积木时压在黑底上，影响极小 */
+        PV + '.blocklyMainBackground{clip-path:inset(var(--nw-top-h,184px) 12px 0 12px round 16px) !important}',
+        /* 积木面板滚动条淡化 */
+        P + '.blocklyFlyoutScrollbar{display:none !important}',
+        /* workspace 滚动条圆角淡灰 */
+        P + '.blocklyMainWorkspaceScrollbar .blocklyScrollbarHandle{'
+          + 'fill:rgba(128,128,128,.28) !important;stroke:none !important;rx:4px !important}',
+        /* 原 2/5 分界线退役：卡片间隙已区分上下区域 */
+        PV + '.injectionDiv::after{display:none !important}',
+        PV + '.blocklyToolboxDiv{padding-bottom:6px !important}',
+
+        /* ---- 书包：header 独立胶囊 + 展开列表独立卡片 ----
+           图一反馈「圆角套圆角不好看」的根因：container 与 header 各有一层
+           17px 圆角背景，两层胶囊不完全重合时露出双层边缘。
+           现在 container 透明，收起时只有 header 自己的 34px 胶囊；
+           TW 展开机制仍是「往容器里追加 backpackList div」——容器保持
+           height:auto 放行，列表以独立圆角卡片出现在下方并播放展开动画
+           （max-height 0→150 撑开 + 淡入下移，handleToggle 同步 resize 画布）。 */
+        P + '[class*="backpack_backpack-container_"]{'
+          + 'margin:6px 10px 2px !important;height:auto !important;min-height:34px !important;'
+          + 'background:transparent !important;border-radius:17px !important;'
+          + 'box-sizing:border-box !important}',
+        P + '[class*="backpack_backpack-header_"]{background:var(--nw-card) !important;'
+          + 'height:34px !important;min-height:34px !important;box-sizing:border-box !important;'
+          + 'padding:0 !important;border-radius:17px !important}',
+        P + '[class*="backpack_backpack-header_"] span{'
+          + 'color:var(--nw-text) !important;font-size:13px !important;font-weight:600 !important;'
+          + 'line-height:34px !important}',
+        /* 展开的横向列表：独立圆角卡片 + 展开过渡动画 */
+        P + '[class*="backpack_backpack-list_"]{'
+          + 'background:var(--nw-card) !important;border:0 !important;'
+          + 'min-height:80px !important;max-height:150px !important;'
+          + 'border-radius:14px !important;margin-top:4px !important;'
+          + 'overflow:hidden !important;'
+          + 'animation:nwBpOpen .3s cubic-bezier(.25,.8,.3,1) !important}',
+        '@keyframes nwBpOpen{from{max-height:0;opacity:0;transform:translateY(-6px)}'
+          + '60%{opacity:1}to{max-height:150px;opacity:1;transform:none}}',
+        P + '[class*="backpack_status-message_"], ' + P + '[class*="backpack_error-message_"]{'
+          + 'color:var(--nw-dim) !important;font-size:12px !important}',
+        /* 「更多」按钮：--nw-pill 已提亮为 tab 组底色，这里用卡片灰保持对比 */
+        P + '[class*="backpack_more_"]{background:var(--nw-card2) !important;'
+          + 'color:var(--nw-text) !important;border-radius:12px !important}',
+
+        /* ---- 属性栏：按图一重排（角色名→X→Y→大小→方向→显示/隐藏）----
+           两个 row 已 display:contents 进同一 flex 序列，用 order 重排：
+           row-primary 的 3 组 = 名/x/y（order 1-3），第二行 大小/方向 提到
+           order 4/5，显示/隐藏 toggle 组殿后 order 6。 */
+        P + '[class*="sprite-info_sprite-info_"]{background:transparent !important;'
+          + 'border-bottom:1px solid var(--nw-line) !important;height:36px !important}',
+        P + '[class*="sprite-info_row_"]:not([class*="row-primary_"]) > :nth-child(1){order:6 !important}',
+        P + '[class*="sprite-info_row_"]:not([class*="row-primary_"]) > :nth-child(2){order:4 !important}',
+        P + '[class*="sprite-info_row_"]:not([class*="row-primary_"]) > :nth-child(3){order:5 !important}',
+        P + '[class*="sprite-info_row-primary_"] > :nth-child(1){order:1 !important}',
+        P + '[class*="sprite-info_row-primary_"] > :nth-child(2){order:2 !important}',
+        P + '[class*="sprite-info_row-primary_"] > :nth-child(3){order:3 !important}',
+        /* 输入框：深灰胶囊 */
+        P + '[class*="sprite-info_sprite-info_"] input{'
+          + 'height:28px !important;min-height:28px !important;flex:0 0 40px !important;width:40px !important;'
+          + 'border-radius:14px !important;background:var(--nw-card2) !important;'
+          + 'border:1px solid var(--nw-line) !important;color:var(--nw-text) !important;'
+          + 'font-size:11px !important}',
+        P + '[class*="sprite-info_row-primary_"] > *:first-child input{'
+          + 'width:64px !important;flex:0 0 64px !important}',
+        P + '[class*="sprite-info_sprite-info_"] [class*="label_"] span{'
+          + 'color:var(--nw-text) !important;font-size:10px !important;font-weight:600 !important}',
+        /* 显示/隐藏：深灰胶囊分段控件（位于最后） */
+        P + '[class*="sprite-info_sprite-info_"] [class*="toggle-buttons_"]{'
+          + 'background:var(--nw-card2) !important;border-radius:15px !important;padding:1px !important}',
+        P + '[class*="sprite-info_sprite-info_"] [class*="toggle-buttons_"] button{'
+          + 'background:transparent !important;border-radius:13px !important;'
+          + 'width:26px !important;height:26px !important}',
+        P + '[class*="sprite-info_sprite-info_"] [class*="toggle-buttons_"] button img{'
+          + 'filter:brightness(0) invert(1) !important}',
+        /* 浅色主题：白底上图标改黑色（深色分支才是白图标） */
+        P0 + '[data-nw-ui="light"] [class*="sprite-info_sprite-info_"] [class*="toggle-buttons_"] button img{'
+          + 'filter:brightness(0) !important}',
+        /* 显示/隐藏分段控件里的选中态描边（原生红色）统一为中性 */
+        P + '[class*="sprite-info_sprite-info_"] [class*="toggle-buttons_"] button{'
+          + 'border:0 !important;box-shadow:none !important}',
+        /* label 与输入间距 */
+        P + '[class*="sprite-info_sprite-info_"] [class*="label_input-group_"]{gap:4px !important}',
+
+        /* ---- 底部工具栏：圆角灰条 ---- */
+        P0 + '{--nw-menu-h:52px}',
+        P + '[class*="gui_menu-bar-position_"]{margin:0 8px !important;'
+          + 'width:calc(100% - 16px) !important;box-sizing:border-box !important;'
+          + 'padding-bottom:calc(6px + env(safe-area-inset-bottom,0px)) !important;background:var(--nw-bg) !important}',
+        /* 页面禁止滚动：工具栏 margin + 100% 宽曾把 scrollWidth 撑到 494>486，
+           真机上表现为整页可左右滑动；WebView 对 overflow:hidden 的根节点
+           仍会橡皮筋上下拉，overscroll-behavior:none 一并掐掉 */
+        'html.' + CLS + '{overscroll-behavior:none !important;overflow:hidden !important}',
+        P + 'body{overscroll-behavior:none !important;overflow:hidden !important}',
+        P + '[class*="menu-bar_menu-bar_"]{background:var(--nw-card) !important;'
+          + 'border-radius:20px !important;height:var(--nw-menu-h) !important;'
+          + 'min-height:var(--nw-menu-h) !important;padding:0 46px 0 10px !important}',
+        /* 菜单栏图标统一转白（dark）：TW 原生 svg 有白有黑（AI 魔法棒是黑色），
+           这里按「menu-bar-item 直系图标」命中，下拉菜单里的彩色旗帜等
+           非直系图标不受影响；浅色主题已有对应的转黑规则 */
+        P + '[class*="menu-bar_main-menu_"] [class*="menu-bar_menu-bar-item_"] > img, '
+          + P + '[class*="menu-bar_main-menu_"] [class*="menu-bar_menu-bar-item_"] > svg, '
+          + P + '[class*="menu-bar_menu-bar_"] > [class*="menu-bar_menu-bar-item_"] img{'
+          + 'filter:brightness(0) invert(1) !important}',
+        /* 浅色主题：工具栏图标是白色 svg，白底卡片上需转黑（只碰工具栏按钮
+           的直属图标，菜单里的彩色旗帜不受影响） */
+        P0 + '[data-nw-ui="light"] [class*="menu-bar_main-menu_"] [class*="menu-bar_menu-bar-item_"] > img, '
+          + P0 + '[data-nw-ui="light"] [class*="menu-bar_main-menu_"] [class*="menu-bar_menu-bar-item_"] > svg, '
+          + P0 + '[data-nw-ui="light"] [class*="menu-bar_menu-bar_"] > [class*="menu-bar_menu-bar-item_"] img{'
+          + 'filter:brightness(0) !important}',
+        P + '.nw-add-btn{color:var(--nw-text) !important}',
+        /* 工具栏问号按钮贴右 */
+        P + '[class*="menu-bar_menu-bar_"] > [class*="menu-bar_menu-bar-item_"]{top:4px !important;right:4px !important}',
+
+        /* ---- 扩展按钮：蓝色圆形，钉在积木卡片左下（图一） ----
+           必须用 PV 前缀（与原顶部规则同 specificity，后写者胜）：
+           P 前缀压不过原有的 PV 隐藏/透明规则。 */
+        P + '[class*="gui_extension-button-container_"]{background:transparent !important;border:0 !important;box-shadow:none !important}',
+        /* 图二/图三：扩展按钮跟在分类卡片正下方（卡片底缘由 JS 写 --nw-tb-bottom），
+           分类卡片限高后按钮底缘 ≈ 积木面板底缘，不再超出积木列表区域 */
+        PV + '[class*="gui_extension-button-container_"]{'
+          + 'background:transparent !important;border:0 !important;box-shadow:none !important;'
+          + 'position:fixed !important;left:14px !important;'
+          + 'top:calc(var(--nw-tb-bottom, 292px) + 6px) !important;'
+          + 'bottom:auto !important;width:40px !important;height:40px !important;z-index:60 !important}',
+        PV + 'button[class*="gui_extension-button_"]{'
+          + 'width:40px !important;height:40px !important;border-radius:50% !important;'
+          + 'background:#4c97ff !important;box-shadow:0 3px 10px rgba(0,0,0,.35) !important;'
+          + 'border:0 !important;display:flex !important;align-items:center !important;'
+          + 'justify-content:center !important;font-size:0 !important}',
+        P + 'button[class*="gui_extension-button_"]{'
+          + 'width:40px !important;height:40px !important;border-radius:50% !important;'
+          + 'background:#4c97ff !important;box-shadow:0 3px 10px rgba(0,0,0,.35) !important;'
+          + 'border:0 !important;display:flex !important;align-items:center !important;'
+          + 'justify-content:center !important}',
+        PV + '[class*="gui_extension-button-icon_"]{display:block !important;'
+          + 'width:22px !important;height:22px !important;margin:0 !important;'
+          + 'filter:brightness(0) invert(1) !important}',
+        P + '[class*="gui_extension-button-icon_"]{'
+          + 'width:22px !important;height:22px !important;margin:0 !important;'
+          + 'filter:brightness(0) invert(1) !important}',
+        PV + 'button[class*="gui_extension-button_"]::after{content:none !important}',
+        P + 'button[class*="gui_extension-button_"]::after{content:none !important}',
+
+        /* ---- Blockly 缩放控件（保留：代码区左下三枚圆钮） ---- */
+        P + '.blocklyZoom img{filter:none !important}',
+        P + '.blocklyZoom > *, .blocklyZoom{opacity:.92 !important}'
       ].join('\n');
 
       function injectCss() {
@@ -1231,6 +1543,31 @@
         st.textContent = css;
         (document.head || document.documentElement).appendChild(st);
       }
+
+      /* 图一重设计的双主题分支：TW 把主题变量以 inline style 挂在 <html> 上
+         （--ui-white：深色 #111 / 浅色 hsla(0,100%,100%,1)）。检测变量亮度写
+         data-nw-ui，覆盖层的卡片/胶囊配色按此切换；切主题时 TW 重写 html
+         style，MutationObserver 即时同步。 */
+      function syncUiTheme() {
+        try {
+          var cs = getComputedStyle(document.documentElement);
+          var uw = (cs.getPropertyValue('--ui-white') || '').trim().toLowerCase();
+          var dark = true;
+          if (uw === '#fff' || uw === '#ffffff' || uw.indexOf('white') !== -1) {
+            dark = false;
+          } else {
+            var m = uw.match(/^hsla?\(\s*[\d.]+(?:deg)?\s*,\s*[\d.]+%\s*,\s*([\d.]+)%/);
+            if (m) dark = parseFloat(m[1]) < 90;          // 亮度 ≥90% 视为浅色
+            else dark = uw.indexOf('255') === -1;          // rgb(255,…) 视为浅色
+          }
+          document.documentElement.setAttribute('data-nw-ui', dark ? 'dark' : 'light');
+        } catch (e) {}
+      }
+      try {
+        new MutationObserver(syncUiTheme).observe(document.documentElement, {
+          attributes: true, attributeFilter: ['style', 'class']
+        });
+      } catch (e) {}
 
       /* 手机没有 hover，设置菜单的二级菜单靠 :hover 展开 → 触屏点不开。
          在捕获阶段拦截「自身带子菜单」的菜单项点击，切换自定义
@@ -1685,8 +2022,10 @@
         var topH = Math.round(H * 0.4);   // 代码列表 2/5，代码放置区 3/5
         if (verticalEnabled()) {
           document.documentElement.style.setProperty('--nw-top-h', topH + 'px');
-          flyout.getWidth = function () { return W - 60; };
-          flyout.DEFAULT_WIDTH = W - 60;
+          /* 图一重设计：积木面板变成悬浮圆角卡片——四周留 8px 间隙，
+             分类列宽 60 不变，卡片从 x=68 起铺到 vw-8。宽度同步减 16。 */
+          flyout.getWidth = function () { return W - 76; };
+          flyout.DEFAULT_WIDTH = W - 76;
           ws.getMetrics = function () {
             var m = o.getMetrics.call(this);
             m.absoluteLeft = 0;
@@ -1703,8 +2042,8 @@
           flyout.position = function () {
             if (!this.isVisible()) return;
             this.width_ = this.getWidth();
-            var x = 60, y = 0;
-            this.height_ = topH;
+            var x = 68, y = 8;
+            this.height_ = topH - 16;
             this.setBackgroundPath_(this.width_, this.height_);
             this.svgGroup_.setAttribute('width', this.width_);
             this.svgGroup_.setAttribute('height', this.height_);
@@ -1763,17 +2102,26 @@
           var extOnTop = er && er.top < 60 && er.left > 0;
           var extL = extOnTop ? er.left : (sr && sr.left > 0 ? sr.left : window.innerWidth - 84);
           if (extL <= 0) extL = window.innerWidth - 84;
-          var left = Math.max(Math.round(right) + 6, 8);
-          var w = Math.round(extL) - 6 - left;
+          /* 与 tab 组底（::before：left 6px，宽 100%-46vw-12px）保持 8px 间隙：
+             tab 区右缘在组底右缘内侧 10px，只按 tab 算会压到组底上（粘连） */
+          var segRight = window.innerWidth - window.innerWidth * 0.46 - 6;
+          var left = Math.max(Math.round(right) + 6, Math.round(segRight) + 8, 8);
+          /* 右侧留 12px 间隙：6px 会与舞台胶囊贴脸（真机实测重叠） */
+          var w = Math.round(extL) - 12 - left;
           if (w >= 56) {
             var s = fb.style;
             s.setProperty('position', 'fixed', 'important');
-            s.setProperty('top', '2px', 'important');
-            s.setProperty('height', '36px', 'important');
+            s.setProperty('top', '4px', 'important');
+            s.setProperty('height', '34px', 'important');
             s.setProperty('left', left + 'px', 'important');
             s.setProperty('width', w + 'px', 'important');
             s.setProperty('right', 'auto', 'important');
             s.setProperty('bottom', 'auto', 'important');
+            // 图一重设计：查找框显示为「🔍 搜索」胶囊
+            try {
+              var finp = fb.querySelector('input');
+              if (finp) finp.placeholder = '搜索';
+            } catch (e) {}
           }
         } catch (e) {}
       }
@@ -1815,15 +2163,25 @@
       function refresh() {
         var on = portrait();
         var root = document.documentElement;
+        syncUiTheme();
         var changed = root.classList.contains(CLS) !== on;
         if (on) root.classList.add(CLS); else root.classList.remove(CLS);
         if (on) {
           ensureStageButton();
           ensureAddButtons();
           syncTabClass();
+          updateTabInd();
           layoutFindBar();
+          layoutToolbox();
           if (changed) applyFlyoutWidth(patchedWs, true);
-          applyEditorLayout();     // 竖屏：按排列方式应用/还原坐标分区
+          /* 编辑弹层打开时也必须重排：键盘收起在多数 WebView 只变
+             visualViewport 不触发 window resize，若此处跳过，布局和
+             Blockly 滚动条会停留在键盘弹出时的小视口不再恢复（用户实测：
+             关闭输入法后编程区滚动轴停在中间）。弹层跟随由 MutationObserver
+             盯 blocklyBlockCanvas transform 兜底（误差 <2px），不依赖跳过。 */
+          applyEditorLayout();   // 竖屏：按排列方式应用/还原坐标分区（内含 reflow）
+          layoutToolbox();       // 分区重算 --nw-top-h 后必须再量一次，
+                                 // 否则键盘等视口变化后 toolbox 超出积木面板
         } else if (changed) {
           root.classList.remove('nw-no-ext');
           root.classList.remove('nw-add-fixed');
@@ -1834,6 +2192,193 @@
           exitFullStage();
         }
       }
+
+      /* ---------------- 图二/图三：分类卡片限高 + 扩展按钮跟随 ----------------
+         分类卡片与扩展按钮（40px + 6px 间隙 = 46px）整体必须收进积木面板
+         （flyout，高 --nw-top-h-8）内：layoutToolbox 量出 flyout 底缘，
+         把「flyout 底缘 - 卡片顶部 - 46」写进 --nw-tb-avail 作 max-height
+         与滚动上限（分类多时卡片内部上下滑动）；卡片实际底缘写进
+         --nw-tb-bottom，fixed 定位的扩展按钮随之贴在正下方，底缘恰好
+         ≈ flyout 底缘。ResizeObserver 盯 toolbox（分类增减/语言切换）
+         即时更新 */
+      function layoutToolbox() {
+        var tb = document.querySelector('.blocklyToolboxDiv');
+        if (!tb) return;
+        var r = tb.getBoundingClientRect();
+        if (!r.height) return;
+        document.documentElement.style.setProperty('--nw-tb-bottom', Math.round(r.bottom) + 'px');
+        var avail = 244;
+        var inj = document.querySelector('.injectionDiv');
+        if (inj) {
+          var ir = inj.getBoundingClientRect();
+          var topH = parseFloat(getComputedStyle(document.documentElement)
+            .getPropertyValue('--nw-top-h')) || 0;
+          if (topH > 0) {
+            avail = Math.max(120, Math.round(ir.top + topH - 8 - r.top - 46));
+          } else {
+            avail = Math.max(120, Math.round(ir.bottom - r.top - 8));
+          }
+        }
+        document.documentElement.style.setProperty('--nw-tb-avail', avail + 'px');
+      }
+      (function () {
+        var watched = null;
+        setInterval(function () {
+          var tb = document.querySelector('.blocklyToolboxDiv');
+          if (tb && tb !== watched && window.ResizeObserver) {
+            watched = tb;
+            try { new ResizeObserver(function () { layoutToolbox(); }).observe(tb); } catch (e) {}
+          }
+        }, 800);
+      })();
+
+      /* ---------------- tab 选中胶囊滑动指示器 ----------------
+         选中底色画在 tab-list 的 ::after 上，位置/宽度走 CSS 变量；
+         MutationObserver 盯选中 class 变化，量出新 tab 的矩形写入变量，
+         ::after 的 transition 完成非线性滑动 */
+      function updateTabInd() {
+        if (!active() || !portrait()) return;
+        var tl = document.querySelector('ul[class*="gui_tab-list_"]');
+        if (!tl) return;
+        var sel = tl.querySelector('.react-tabs__tab--selected, [class*="gui_is-selected_gYgGm"]');
+        if (!sel) return;
+        var lr = tl.getBoundingClientRect(), sr = sel.getBoundingClientRect();
+        if (!sr.width) return;
+        var root = document.documentElement;
+        root.style.setProperty('--nw-ind-x', Math.round(sr.left - lr.left) + 'px');
+        root.style.setProperty('--nw-ind-w', Math.round(sr.width) + 'px');
+      }
+      (function () {
+        var watched = null, mo = null;
+        setInterval(function () {
+          var tl = document.querySelector('ul[class*="gui_tab-list_"]');
+          if (tl && tl !== watched) {
+            watched = tl;
+            if (mo) mo.disconnect();
+            try {
+              mo = new MutationObserver(function () { updateTabInd(); });
+              mo.observe(tl, {attributes: true, subtree: true, attributeFilter: ['class']});
+            } catch (e) {}
+          }
+        }, 800);
+      })();
+
+      /* ---------------- 编辑弹层打开时跳过分区重排 ----------------
+         点击积木的输入框/下拉弹出后若键盘顶起视口，重排分区会让积木
+         移到新位置，而 Blockly 的 WidgetDiv/DropDownDiv 不监听 resize——
+         输入框留在旧坐标（图二：错位的第二个输入框）。
+         检测到弹层打开时不做 applyEditorLayout（分区/积木屏幕位置不动，
+         只刷新 toolbox 等轻量项），输入框始终贴住积木；弹层关闭后
+         （键盘收起或点击别处触发的 resize）再正常重排恢复布局。 */
+      function popupOpen() {
+        try {
+          var els = document.querySelectorAll('.blocklyWidgetDiv, .blocklyDropDownDiv');
+          for (var i = 0; i < els.length; i++) {
+            var s = getComputedStyle(els[i]);
+            if (s.display !== 'none' && s.visibility !== 'hidden') return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+      /* 弹层跟随积木（屏幕级）：WidgetDiv/DropDownDiv 只在弹出瞬间定位一次，
+         之后任何原因让积木移动——键盘重排（topH/分区变化不经过 canvas
+         transform）、reflow、TW 自身 resize、画布滚动——弹层都停在旧坐标
+         （图二：错位的输入框）。弹层打开期间用 rAF 每帧量主画布的屏幕
+         矩形：矩形移动量＝积木屏幕移动量（缩放不变时），把差补给弹层；
+         弹层关闭循环自停，零开销。 */
+      function nudgePopups(dx, dy) {
+        if (!dx && !dy) return;
+        try {
+          [].slice.call(document.querySelectorAll('.blocklyWidgetDiv, .blocklyDropDownDiv'))
+            .forEach(function (p) {
+              var s = getComputedStyle(p);
+              if (s.display === 'none' || s.visibility === 'hidden') return;
+              var l = parseFloat(p.style.left) || 0, t = parseFloat(p.style.top) || 0;
+              p.style.setProperty('left', (l + dx) + 'px', 'important');
+              p.style.setProperty('top', (t + dy) + 'px', 'important');
+            });
+        } catch (e) {}
+      }
+      (function () {
+        var rafId = 0, lastRect = null;
+        function mainCanvas() {
+          var cs = document.querySelectorAll('.blocklyBlockCanvas');
+          for (var i = 0; i < cs.length; i++) {
+            if (!cs[i].closest('.blocklyFlyout')) return cs[i];
+          }
+          return null;
+        }
+        function loop() {
+          rafId = 0;
+          if (!popupOpen()) { lastRect = null; return; }
+          var bc = mainCanvas();
+          if (bc) {
+            var r = bc.getBoundingClientRect();
+            if (lastRect && (r.left !== lastRect.left || r.top !== lastRect.top)) {
+              nudgePopups(Math.round(r.left - lastRect.left), Math.round(r.top - lastRect.top));
+            }
+            lastRect = r;
+          }
+          rafId = requestAnimationFrame(loop);
+        }
+        setInterval(function () {
+          if (popupOpen() && !rafId) { lastRect = null; rafId = requestAnimationFrame(loop); }
+        }, 400);
+      })();
+      /* 弹层（输入框/下拉）关闭后主动校正布局：键盘收起在部分 WebView
+         连 visualViewport 事件都不发，布局一直停在键盘弹出时的小视口；
+         用户点掉输入框（唯一弹层关闭信号）后同样没有 resize 来救——
+         轻量轮询检测「弹层从打开变关闭」的瞬间，补一次 refresh 重排。 */
+      var wasPopup = false;
+      setInterval(function () {
+        var now = popupOpen();
+        if (wasPopup && !now && active() && portrait()) {
+          setTimeout(refresh, 80);
+        }
+        wasPopup = now;
+      }, 250);
+
+      /* ---------------- 分类列表：滑动后不再误选分类 ----------------
+         分类卡片改成内部滚动后，手指上下滑动松手时 Blockly 会把落在分类上
+         的收尾触摸当成「选择该分类」，flyout 直接跳到松手位置的分类。
+         捕获阶段做位移门控：touchstart 记录起点，touchmove 累计纵向位移
+         超过 8px 判定为滚动；此后本次触摸的 pointerup / mouseup / click
+         一律拦下（只拦分类区域内的事件），touchend 稍后清标志。
+         纯点击（位移 0）完全不受影响，分类切换、积木拖拽照常。 */
+      (function () {
+        var startY = 0, tracking = false, scrolled = false;
+        function inToolbox(e) {
+          var t = e.target;
+          if (t && t.nodeType === 3) t = t.parentElement;
+          return !!(t && t.closest && t.closest('.blocklyToolboxDiv'));
+        }
+        document.addEventListener('touchstart', function (e) {
+          if (!active() || !portrait() || !inToolbox(e)) { tracking = false; return; }
+          tracking = true; scrolled = false;
+          startY = e.touches[0].clientY;
+        }, {capture: true, passive: true});
+        document.addEventListener('touchmove', function (e) {
+          if (!tracking) return;
+          if (Math.abs(e.touches[0].clientY - startY) > 8) scrolled = true;
+        }, {capture: true, passive: true});
+        function swallow(e) {
+          if (!tracking || !scrolled || !inToolbox(e)) return;
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+        }
+        document.addEventListener('pointerup', swallow, {capture: true});
+        document.addEventListener('mouseup', swallow, {capture: true});
+        document.addEventListener('click', function (e) {
+          swallow(e);
+          if (inToolbox(e)) { tracking = false; scrolled = false; }
+        }, {capture: true});
+        document.addEventListener('touchend', function () {
+          setTimeout(function () { tracking = false; scrolled = false; }, 350);
+        }, {capture: true, passive: true});
+        document.addEventListener('touchcancel', function () {
+          tracking = false; scrolled = false;
+        }, {capture: true, passive: true});
+      })();
 
       /* ---------------- 角色列表：长按才允许拖动换位 ----------------
          GUI 把 sprite-selector-item 的 onTouchStart 直接接到 onMouseDown，
@@ -1969,6 +2514,18 @@
       }
       window.addEventListener('resize', onResize);
       window.addEventListener('orientationchange', onResize);
+      /* 键盘弹出/收起兜底：部分 WebView（adjustPan）不触发 window resize，
+         只变 visualViewport——监听它补一次 refresh，否则点击带输入框的
+         积木弹出键盘后，积木面板/分类卡片仍按全屏高度布局而错位 */
+      if (window.visualViewport) {
+        var vvTimer2;
+        window.visualViewport.addEventListener('resize', function () {
+          clearTimeout(vvTimer2);
+          vvTimer2 = setTimeout(function () {
+            if (portrait()) { refresh(); layoutFindBar(); }
+          }, 160);
+        });
+      }
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', onResize);
       }
@@ -3014,6 +3571,7 @@
   if (WIN_TYPE === 'collaboration') {
     window.CollaborationPreload = {
       getMode: function () { return inv('collabGetMode'); },
+      getSession: function () { return inv('collabGetSession'); },
       getTheme: function () { return inv('getTheme'); },
       getLocalIP: function () { return inv('collabGetLocalIP'); },
       discoverSessions: function (port) { return inv('collabDiscover', { port: port }); },
